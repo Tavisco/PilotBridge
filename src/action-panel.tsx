@@ -13,8 +13,16 @@ import {SerialIcon, UsbIcon} from './icons';
 import {Panel} from './panel';
 import {prefsStore} from './prefs-store';
 import {runSync} from './run-sync';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
+import * as React from 'react';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import InstallMobileIcon from '@mui/icons-material/InstallMobile';
+import FileUploadIcon from '@mui/icons-material/FileUpload';
+import ScienceIcon from '@mui/icons-material/Science';
+import { TestPanel } from './panels/test-panel';
 
-const log = debug('result');
 
 const ConnectionSelector = observer(function ConnectionSelector() {
   const connectionString = prefsStore.get('connectionString');
@@ -59,61 +67,70 @@ const ConnectionSelector = observer(function ConnectionSelector() {
   );
 });
 
-function NoOp() {
-  const handleClick = useCallback(async () => {
-    await runSync(async () => {});
-  }, []);
+
+interface TabPanelProps {
+  children?: React.ReactNode;
+  dir?: string;
+  index: number;
+  value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
 
   return (
-    <Button variant="contained" fullWidth onClick={handleClick}>
-      No-op
-    </Button>
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`full-width-tabpanel-${index}`}
+      aria-labelledby={`full-width-tab-${index}`}
+      {...other}
+    >
+      {value === index && (
+        <Box sx={{ p: 3 }}>
+          <Typography>{children}</Typography>
+        </Box>
+      )}
+    </div>
   );
 }
 
-function ListDb() {
-  const handleClick = useCallback(async () => {
-    await runSync(async (dlpConnection) => {
-      const dbInfoList = await readDbList(dlpConnection, {
-        ram: true,
-        rom: true,
-      });
-      log(dbInfoList.map(({name}) => `=> ${name}`).join('\n'));
-    });
-  }, []);
-  return (
-    <Button variant="contained" fullWidth onClick={handleClick}>
-      List DB
-    </Button>
-  );
+function a11yProps(index: number) {
+  return {
+    id: `full-width-tab-${index}`,
+    'aria-controls': `full-width-tabpanel-${index}`,
+  };
 }
 
 export function ActionPanel(props: PaperProps) {
-  const theme = useTheme();
-  const isWide = useMediaQuery(theme.breakpoints.up('sm'));
+  const [value, setValue] = React.useState(0);
 
-  const controls = [NoOp, ListDb];
+  const handleChange = (event: React.SyntheticEvent, newValue: number) => {
+    setValue(newValue);
+  };
+  
   return (
-    <Panel title="Sync" isExpandedByDefault={true} {...props}>
+    <Panel title="PilotBridge" isExpandedByDefault={true} {...props}>
       <Grid container spacing={1} p={2} justifyContent="center">
         <Grid item>
           <ConnectionSelector />
         </Grid>
         <Grid item xs={12} />
-        {controls.map((Component, idx) => (
-          <Fragment key={idx}>
-            <Grid
-              item
-              xs={4}
-              sm={5}
-              {...(!isWide && idx > 0 ? {sx: {marginLeft: 1}} : {})}
-            >
-              <Component />
-            </Grid>
-            {isWide && <Grid item xs={12} />}
-          </Fragment>
-        ))}
+        <Tabs value={value} onChange={handleChange} centered>
+          <Tab icon={<InstallMobileIcon />} iconPosition="start" label="Install app" {...a11yProps(0)} />
+          <Tab icon={<FileUploadIcon />} iconPosition="start" label="Retrieve app" {...a11yProps(1)} />
+          <Tab icon={<ScienceIcon />} iconPosition="start" label="Testing" {...a11yProps(2)} />
+        </Tabs>
       </Grid>
+      <TabPanel value={value} index={0}>
+          WIP Install App
+        </TabPanel>
+        <TabPanel value={value} index={1}>
+          WIP Retrieve app
+        </TabPanel>
+        <TabPanel value={value} index={2}>
+          <TestPanel/>
+        </TabPanel>
     </Panel>
   );
 }

@@ -1,5 +1,5 @@
 {
-  "name": "web",
+  "name": "PilotBridge",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -17,7 +17,7 @@
     "@mui/material": "^5.16.0",
     "mobx": "^6.13.0",
     "mobx-react": "^9.1.1",
-    "palm-sync": "file:../../",
+    "palm-sync": "file:../palm-sync",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

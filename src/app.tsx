@@ -37,24 +37,24 @@ export function App() {
   }
 
   const panelMargins: CSSProperties = isWide
-    ? {margin: '10px 10px 0 10px'}
+    ? {margin: '5px 5px 0 5px'}
     : {marginBottom: 5};
 
   return (
     <div
       style={{
         position: 'absolute',
-        height: '100vh',
+        height: '99vh',
         width: '100vw',
         display: 'grid',
         ...(isWide
           ? {
               gridTemplateAreas: `
-                'actionPanel logViewer'
-                'deviceInfoPanel logViewer'
+                'actionPanel deviceInfoPanel'
+                '. logViewer'
                 '. logViewer'
               `,
-              gridTemplateColumns: '1fr 2fr',
+              gridTemplateColumns: '2fr 1fr',
               gridTemplateRows: 'min-content min-content 1fr',
             }
           : {
@@ -69,7 +69,7 @@ export function App() {
     >
       <ActionPanel style={{gridArea: 'actionPanel', ...panelMargins}} />
       <DeviceInfoPanel style={{gridArea: 'deviceInfoPanel', ...panelMargins}} />
-      <LogViewer style={{gridArea: 'logViewer', padding: 10}} />
+      <LogViewer style={{gridArea: 'logViewer', padding: 10, ...panelMargins}} />
     </div>
   );
 }
