@@ -20,6 +20,7 @@ import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import InstallMobileIcon from "@mui/icons-material/InstallMobile";
 import FileUploadIcon from "@mui/icons-material/FileUpload";
+import InfoIcon from "@mui/icons-material/Info";
 import ScienceIcon from "@mui/icons-material/Science";
 import { TestPanel } from "./panels/test-panel";
 import Divider from "@mui/material/Divider";
@@ -147,6 +148,12 @@ export function ActionPanel(props: PaperProps) {
           label="Testing"
           {...a11yProps(2)}
         />
+        <Tab
+          icon={<InfoIcon />}
+          iconPosition="start"
+          label="About"
+          {...a11yProps(3)}
+        />
       </Tabs>
 
       <TabPanel value={value} index={0}>
@@ -157,6 +164,9 @@ export function ActionPanel(props: PaperProps) {
       </TabPanel>
       <TabPanel value={value} index={2}>
         <TestPanel />
+      </TabPanel>
+      <TabPanel value={value} index={3}>
+        WIP Info
       </TabPanel>
     </Paper>
   );
