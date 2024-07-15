@@ -17,6 +17,7 @@
     "@mui/material": "^5.16.0",
     "mobx": "^6.13.0",
     "mobx-react": "^9.1.1",
+    "palm-pdb": "^0.2.2",
     "palm-sync": "file:../palm-sync",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
