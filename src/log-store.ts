@@ -23,7 +23,7 @@ class LogStore {
       addLog: action,
       addDivider: action,
     });
-    debug.enable('*');
+    debug.enable('palm-sync:*,!palm-sync:padp,!palm-sync:dlp');
     debug.log = this.addLog.bind(this);
   }
 
@@ -31,7 +31,6 @@ class LogStore {
 
   addLog(message: string) {
     // eslint-disable-next-line prefer-rest-params
-    console.log(...arguments);
     const match = message.match(/^%c([^%]*) %c(.*)/s);
     let module;
     if (match) {
@@ -40,6 +39,12 @@ class LogStore {
       module = '';
     }
     message = message.replace(/%c/g, '').replace(/[+][0-9]+m?s$/, '');
+
+    if (module === 'palm-sync:padp' || module === 'palm-sync:dlp') {
+      return;
+    }
+
+    console.log(...arguments);
     this.logs.push({
       type: LogEntryType.LOG,
       module,

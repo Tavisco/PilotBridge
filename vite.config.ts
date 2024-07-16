@@ -1,9 +1,10 @@
 import {defineConfig} from 'vite';
+import { nodePolyfills } from 'vite-plugin-node-polyfills'
 import react from '@vitejs/plugin-react';
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), nodePolyfills()],
   base: './',
   // We need to explicitly configure Vite to treat palm-sync as CommonJS module
   // as it is in the same monorepo. See documentation:

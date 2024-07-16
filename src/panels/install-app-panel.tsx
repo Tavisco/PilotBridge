@@ -14,7 +14,7 @@ import {
 import DeleteIcon from "@mui/icons-material/Delete";
 import BoltIcon from "@mui/icons-material/Bolt";
 import { runSync } from "./../run-sync";
-import { DlpConnection, writeRawDb } from "palm-sync";
+import { DlpConnection, writeDb, writeDbFromBuffer, writeRawDb } from "palm-sync";
 import { DatabaseHdrType, RawPdbDatabase, RawPrcDatabase } from "palm-pdb";
 
 function formatBytes(bytes: number, decimals = 2): string {
@@ -54,7 +54,12 @@ export function InstallAppPanel() {
         const arrbuf = await file.arrayBuffer();
         const buffer = Buffer.from(arrbuf);
 
-        await writeDbFromBuffer(dlpConnection, buffer, { overwrite: true });
+        const header = DatabaseHdrType.from(buffer);
+        const rawDb = header.attributes.resDB
+        ? RawPrcDatabase.from(buffer)
+        : RawPdbDatabase.from(buffer);
+
+        await writeDb(dlpConnection, rawDb, { overwrite: true });
       }
     });
   };
@@ -113,11 +118,16 @@ export function InstallAppPanel() {
     </Card>
   );
 }
-function writeDbFromBuffer(dlpConnection: DlpConnection, buffer: Buffer, opts: { overwrite: boolean; }) {
-    const header = DatabaseHdrType.from(buffer);
-    const rawDb = header.attributes.resDB
-      ? RawPrcDatabase.from(buffer)
-      : RawPdbDatabase.from(buffer);
-    return writeRawDb(dlpConnection, rawDb, opts);
-}
+// async function writeDbFromBuffer(dlpConnection: DlpConnection, buffer: Buffer, opts: { overwrite: boolean; }) {
+//     const header = DatabaseHdrType.from(buffer);
+//     const rawDb = header.attributes.resDB
+//       ? RawPrcDatabase.from(buffer)
+//       : RawPdbDatabase.from(buffer);
+
+//     //   if (!(rawDb instanceof RawPrcDatabase)) {
+//     //     throw new Error('LOCAL Expected PRC database');
+//     //   }
+
+//     return await writeRawDb(dlpConnection, rawDb, opts);
+// }
 
