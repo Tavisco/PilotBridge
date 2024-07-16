@@ -16,7 +16,7 @@ export const DeviceInfoPanel = observer(function DeviceInfoPanel(
   const {sysInfo, userInfo, sysDateTime} = deviceInfoStore;
 
   return (
-    <Panel title="Device Info" isExpandedByDefault={isWide} {...props}>
+    <Panel title="Device Info" isExpandedByDefault={isWide} {...props} elevation={0}>
       {!sysInfo || !userInfo || !sysDateTime ? (
         <Box
           sx={{

@@ -286,7 +286,7 @@ export function InstallAppPanel() {
   };
 
   return (
-    <Card sx={{ maxWidth: 600, margin: "auto", mt: 4 }}>
+    <Card sx={{ width: "100%"}}>
       <CardContent>
         <Typography variant="h6" component="div">
           Select which files to install
