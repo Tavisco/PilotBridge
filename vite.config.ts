@@ -4,7 +4,12 @@ import react from '@vitejs/plugin-react';
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react(), nodePolyfills()],
+  plugins: [react(), nodePolyfills({
+    overrides: {
+      // Since `fs` is not supported in browsers, we can use the `memfs` package to polyfill it.
+      fs: 'memfs',
+    },
+  })],
   base: './',
   // We need to explicitly configure Vite to treat palm-sync as CommonJS module
   // as it is in the same monorepo. See documentation:

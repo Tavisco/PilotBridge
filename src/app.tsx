@@ -1,6 +1,4 @@
 import Typography from "@mui/material/Typography";
-import useMediaQuery from "@mui/material/useMediaQuery";
-import { useTheme } from "@mui/material/styles";
 import { useCallback } from "react";
 import {
   Toolbar,
@@ -32,6 +30,7 @@ import { prefsStore } from "./prefs-store";
 import { InstallAppPanel } from "./panels/install-app-panel";
 import { TestPanel } from "./panels/test-panel";
 import { DeviceInfoPanel } from "./device-info-panel";
+import { DoHotsyncBar } from "./do-hotsync-bar";
 
 function UnsupportedApisBanner() {
   return (
@@ -73,7 +72,7 @@ const ConnectionSelector = observer(function ConnectionSelector() {
         placeContent: "center",
         textAlign: "center",
         padding: "1em",
-        paddingTop: "0.5em"
+        paddingTop: "0.5em",
       }}
     >
       <Typography variant="caption">Connection method</Typography>
@@ -125,7 +124,7 @@ export function App() {
   };
 
   const drawer = (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <div>
         <Toolbar>
           <Typography variant="h6" noWrap component="div">
@@ -136,8 +135,8 @@ export function App() {
         <List>
           <ListItem key="hotsync" disablePadding>
             <ListItemButton
-              selected={currentComponent === 'hotsync'}
-              onClick={() => handleListItemClick('hotsync')}
+              selected={currentComponent === "hotsync"}
+              onClick={() => handleListItemClick("hotsync")}
             >
               <ListItemIcon>
                 <SyncIcon />
@@ -147,8 +146,8 @@ export function App() {
           </ListItem>
           <ListItem key="simple-install" disablePadding>
             <ListItemButton
-              selected={currentComponent === 'install'}
-              onClick={() => handleListItemClick('install')}
+              selected={currentComponent === "install"}
+              onClick={() => handleListItemClick("install")}
             >
               <ListItemIcon>
                 <InstallMobileIcon />
@@ -158,8 +157,8 @@ export function App() {
           </ListItem>
           <ListItem key="simple-retrieve" disablePadding>
             <ListItemButton
-              selected={currentComponent === 'retrieve'}
-              onClick={() => handleListItemClick('retrieve')}
+              selected={currentComponent === "retrieve"}
+              onClick={() => handleListItemClick("retrieve")}
             >
               <ListItemIcon>
                 <FileUploadIcon />
@@ -169,8 +168,8 @@ export function App() {
           </ListItem>
           <ListItem key="testing" disablePadding>
             <ListItemButton
-              selected={currentComponent === 'testing'}
-              onClick={() => handleListItemClick('testing')}
+              selected={currentComponent === "testing"}
+              onClick={() => handleListItemClick("testing")}
             >
               <ListItemIcon>
                 <ScienceIcon />
@@ -180,8 +179,8 @@ export function App() {
           </ListItem>
           <ListItem key="about" disablePadding>
             <ListItemButton
-              selected={currentComponent === 'about'}
-              onClick={() => handleListItemClick('about')}
+              selected={currentComponent === "about"}
+              onClick={() => handleListItemClick("about")}
             >
               <ListItemIcon>
                 <InfoIcon />
@@ -192,9 +191,9 @@ export function App() {
         </List>
         <Divider />
       </div>
-      <div style={{ marginTop: 'auto'}}>
+      <div style={{ marginTop: "auto" }}>
         <Divider />
-        <DeviceInfoPanel/>
+        <DeviceInfoPanel />
         <Divider />
         <ConnectionSelector />
       </div>
@@ -242,18 +241,20 @@ export function App() {
           >
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" noWrap component="div">
-            PilotBridge
-            <Typography variant="caption" px={1}>
-              V 0.0.1
+          <Box sx={{ flexGrow: 1 }}>
+            <Typography variant="h6" noWrap component="div">
+              PilotBridge
+              <Typography variant="caption" px={1}>
+                V 0.0.1
+              </Typography>
             </Typography>
-          </Typography>
+          </Box>
+          <DoHotsyncBar/>
         </Toolbar>
       </AppBar>
       <Box
         component="nav"
         sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
-        aria-label="mailbox folders"
       >
         <Drawer
           variant="temporary"

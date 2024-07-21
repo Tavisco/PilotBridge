@@ -15,6 +15,7 @@
     "@fontsource/inter": "^5.0.19",
     "@mui/icons-material": "^5.15.21",
     "@mui/material": "^5.16.0",
+    "memfs": "^4.9.3",
     "mobx": "^6.13.0",
     "mobx-react": "^9.1.1",
     "palm-pdb": "^0.2.2",
