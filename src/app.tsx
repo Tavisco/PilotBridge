@@ -16,6 +16,7 @@ import {
   SvgIcon,
   ToggleButton,
   ToggleButtonGroup,
+  Container,
 } from "@mui/material";
 import React from "react";
 import MenuIcon from "@mui/icons-material/Menu";
@@ -31,6 +32,10 @@ import { InstallAppPanel } from "./panels/install-app-panel";
 import { TestPanel } from "./panels/test-panel";
 import { DeviceInfoPanel } from "./device-info-panel";
 import { DoHotsyncBar } from "./do-hotsync-bar";
+import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
+import ContactsIcon from "@mui/icons-material/Contacts";
+import ChecklistIcon from "@mui/icons-material/Checklist";
+import StickyNote2Icon from "@mui/icons-material/StickyNote2";
 
 function UnsupportedApisBanner() {
   return (
@@ -133,15 +138,48 @@ export function App() {
         </Toolbar>
         <Divider />
         <List>
-          <ListItem key="hotsync" disablePadding>
+          <ListItem key="calendar" disablePadding>
             <ListItemButton
-              selected={currentComponent === "hotsync"}
-              onClick={() => handleListItemClick("hotsync")}
+              selected={currentComponent === "calendar"}
+              onClick={() => handleListItemClick("calendar")}
             >
               <ListItemIcon>
-                <SyncIcon />
+                <CalendarMonthIcon />
               </ListItemIcon>
-              <ListItemText primary="Hotsync" />
+              <ListItemText primary="Calendar" />
+            </ListItemButton>
+          </ListItem>
+          <ListItem key="address" disablePadding>
+            <ListItemButton
+              selected={currentComponent === "address"}
+              onClick={() => handleListItemClick("address")}
+            >
+              <ListItemIcon>
+                <ContactsIcon />
+              </ListItemIcon>
+              <ListItemText primary="Address" />
+            </ListItemButton>
+          </ListItem>
+          <ListItem key="todo" disablePadding>
+            <ListItemButton
+              selected={currentComponent === "todo"}
+              onClick={() => handleListItemClick("todo")}
+            >
+              <ListItemIcon>
+                <ChecklistIcon />
+              </ListItemIcon>
+              <ListItemText primary="To Do" />
+            </ListItemButton>
+          </ListItem>
+          <ListItem key="memo" disablePadding>
+            <ListItemButton
+              selected={currentComponent === "memo"}
+              onClick={() => handleListItemClick("memo")}
+            >
+              <ListItemIcon>
+                <StickyNote2Icon />
+              </ListItemIcon>
+              <ListItemText primary="Memo" />
             </ListItemButton>
           </ListItem>
           <ListItem key="simple-install" disablePadding>
@@ -249,7 +287,7 @@ export function App() {
               </Typography>
             </Typography>
           </Box>
-          <DoHotsyncBar/>
+          <DoHotsyncBar />
         </Toolbar>
       </AppBar>
       <Box
@@ -297,7 +335,27 @@ export function App() {
       >
         <Toolbar />
 
-        {renderComponent()}
+        <Container
+      maxWidth="md" // Adjust maxWidth according to your needs (e.g., xs, sm, md, lg, xl)
+      sx={{
+        paddingX: { xs: 2, sm: 4, md: 8 }, // Adjust padding for different screen sizes
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}
+    >
+      {/* <Box
+        sx={{
+          width: '100%',
+          maxWidth: '500px', // Set a maxWidth for your component
+          padding: '20px', // Add padding inside the Box if needed
+        }}
+      > */}
+{renderComponent()}
+      {/* </Box> */}
+    </Container>
+
+        
       </Box>
     </Box>
   );

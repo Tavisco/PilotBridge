@@ -2,16 +2,23 @@ import { Box, FormControl, InputLabel, Select, MenuItem, Button } from "@mui/mat
 import { observer } from "mobx-react";
 import SyncIcon from "@mui/icons-material/Sync";
 import { runSync } from "./run-sync";
-import { DlpConnection, syncDevice } from "palm-sync";
+import { DlpConnection, syncDevice, UpdateClockConduit, UpdateSyncInfoConduit } from "palm-sync";
+import { WebDatabaseStorageImplementation } from "./database-storage/web-db-stg-impl";
 
 export const DoHotsyncBar = observer(function DoHotsyncBar()
 {
     const handleDoSyncClick = async () => {
         return await runSync(async (dlpConnection: DlpConnection) => {
             try {
-                const path = "Palms" as string;
                 const user = "TaviscoVisor" as string;
-                return await syncDevice(dlpConnection, path, user);
+                let dbStg = new WebDatabaseStorageImplementation();
+
+                let conduits = [
+                  new UpdateClockConduit(),
+                  new UpdateSyncInfoConduit(),
+                ];
+
+                return await syncDevice(dlpConnection, user, dbStg, conduits);
             } catch (error) {
                 console.error(error);
             }
@@ -36,14 +43,17 @@ export const DoHotsyncBar = observer(function DoHotsyncBar()
             label="Device"
             // onChange={handleChange}
           >
-            <MenuItem value={20}>Twenty</MenuItem>
-            <MenuItem value={30}>Thirty</MenuItem>
+          <MenuItem value="">
+            <em>Add new</em>
+          </MenuItem>
+            <MenuItem value={20}>TaviscoVisor</MenuItem>
+            <MenuItem value={30}>TaviscoTX</MenuItem>
           </Select>
         </FormControl>
         <Button
           color="success"
           size="small"
-          variant="outlined"
+          variant="contained"
           startIcon={<SyncIcon />}
           sx={{ marginLeft: "10px", width: "14em" }}
           onClick={handleDoSyncClick}

@@ -289,7 +289,7 @@ export function InstallAppPanel() {
     <Card sx={{ width: "100%"}}>
       <CardContent>
         <Typography variant="h6" component="div">
-          Select which files to install
+          Install list
         </Typography>
         <Box mt={2}>
           <Button variant="contained" component="label">
@@ -331,7 +331,7 @@ export function InstallAppPanel() {
         </List>
       </CardContent>
       <CardActions>
-        <Button
+        {/* <Button
           variant="contained"
           color="primary"
           onClick={handleGoClick}
@@ -339,7 +339,7 @@ export function InstallAppPanel() {
           endIcon={<BoltIcon />}
         >
           Install
-        </Button>
+        </Button> */}
       </CardActions>
     </Card>
   );

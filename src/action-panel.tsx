@@ -2,7 +2,10 @@ import FileUploadIcon from "@mui/icons-material/FileUpload";
 import InfoIcon from "@mui/icons-material/Info";
 import InstallMobileIcon from "@mui/icons-material/InstallMobile";
 import ScienceIcon from "@mui/icons-material/Science";
-import SyncIcon from "@mui/icons-material/Sync";
+import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
+import ContactsIcon from "@mui/icons-material/Contacts";
+import ChecklistIcon from "@mui/icons-material/Checklist";
+import StickyNote2Icon from "@mui/icons-material/StickyNote2";
 import Box from "@mui/material/Box";
 import Divider from "@mui/material/Divider";
 import Paper, { PaperProps } from "@mui/material/Paper";
@@ -127,50 +130,77 @@ export function ActionPanel(props: PaperProps) {
 
       <Tabs value={value} onChange={handleChange} centered>
       <Tab
-          icon={<SyncIcon />}
+          icon={<CalendarMonthIcon />}
           iconPosition="start"
-          label="Hotsync"
+          label="Calendar"
           {...a11yProps(0)}
+        />
+        <Tab
+          icon={<ContactsIcon />}
+          iconPosition="start"
+          label="Address"
+          {...a11yProps(1)}
+        />
+        <Tab
+          icon={<ChecklistIcon />}
+          iconPosition="start"
+          label="To Do"
+          {...a11yProps(2)}
+        />
+        <Tab
+          icon={<StickyNote2Icon />}
+          iconPosition="start"
+          label="Memo"
+          {...a11yProps(3)}
         />
         <Tab
           icon={<InstallMobileIcon />}
           iconPosition="start"
           label="Install app"
-          {...a11yProps(1)}
+          {...a11yProps(4)}
         />
         <Tab
           icon={<FileUploadIcon />}
           iconPosition="start"
           label="Retrieve app"
-          {...a11yProps(2)}
+          {...a11yProps(5)}
         />
         <Tab
           icon={<ScienceIcon />}
           iconPosition="start"
           label="Testing"
-          {...a11yProps(3)}
+          {...a11yProps(6)}
         />
         <Tab
           icon={<InfoIcon />}
           iconPosition="start"
           label="About"
-          {...a11yProps(4)}
+          {...a11yProps(7)}
         />
       </Tabs>
 
       <TabPanel value={value} index={0}>
-        WIP Hotsync
+        WIP Calendar
       </TabPanel>
       <TabPanel value={value} index={1}>
-        <InstallAppPanel/>
+        WIP Contacts
       </TabPanel>
       <TabPanel value={value} index={2}>
-        WIP Retrieve app
+        WIP ToDo
       </TabPanel>
       <TabPanel value={value} index={3}>
-        <TestPanel />
+        WIP Memo
       </TabPanel>
       <TabPanel value={value} index={4}>
+        <InstallAppPanel/>
+      </TabPanel>
+      <TabPanel value={value} index={5}>
+        WIP Retrieve app
+      </TabPanel>
+      <TabPanel value={value} index={6}>
+        <TestPanel />
+      </TabPanel>
+      <TabPanel value={value} index={7}>
         WIP Info
       </TabPanel>
     </Paper>
