@@ -26,7 +26,7 @@ export const LogViewer = observer(function LogViewer(props: CardProps) {
 
   return (
     <Card variant="outlined" {...props}>
-      <CardContent sx={{ height: "100%", overflow: "hidden" }}>
+      <CardContent sx={{ height: "93vh", overflow: "hidden" }}>
         <Typography sx={{ fontSize: 16 }} color="text.secondary" gutterBottom>
           Sync log
         </Typography>

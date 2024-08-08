@@ -17,6 +17,7 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   Container,
+  Grid,
 } from "@mui/material";
 import React from "react";
 import MenuIcon from "@mui/icons-material/Menu";
@@ -36,6 +37,7 @@ import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import ContactsIcon from "@mui/icons-material/Contacts";
 import ChecklistIcon from "@mui/icons-material/Checklist";
 import StickyNote2Icon from "@mui/icons-material/StickyNote2";
+import { LogViewer } from "./log-viewer";
 
 function UnsupportedApisBanner() {
   return (
@@ -244,8 +246,8 @@ export function App() {
 
   const renderComponent = () => {
     switch (currentComponent) {
-      case "hotsync":
-        return <div>WIP Hotsync</div>;
+      case "calendar":
+        return <div>WIP Calendar</div>;
       case "install":
         return <InstallAppPanel />;
       case "retrieve":
@@ -260,7 +262,7 @@ export function App() {
   };
 
   return (
-    <Box sx={{ display: "flex" }}>
+    <Box sx={{ display: "flex", height: "100vh" }}>
       <CssBaseline />
       <AppBar
         position="fixed"
@@ -335,27 +337,24 @@ export function App() {
       >
         <Toolbar />
 
-        <Container
-      maxWidth="md" // Adjust maxWidth according to your needs (e.g., xs, sm, md, lg, xl)
-      sx={{
-        paddingX: { xs: 2, sm: 4, md: 8 }, // Adjust padding for different screen sizes
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-      }}
-    >
-      {/* <Box
-        sx={{
-          width: '100%',
-          maxWidth: '500px', // Set a maxWidth for your component
-          padding: '20px', // Add padding inside the Box if needed
-        }}
-      > */}
-{renderComponent()}
-      {/* </Box> */}
-    </Container>
-
-        
+        <Grid container spacing={2}>
+          <Grid xs={8}>
+            <Container
+              maxWidth="md" // Adjust maxWidth according to your needs (e.g., xs, sm, md, lg, xl)
+              sx={{
+                paddingX: { xs: 2, sm: 4, md: 8 }, // Adjust padding for different screen sizes
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              {renderComponent()}
+            </Container>
+          </Grid>
+          <Grid xs={4}>
+            <LogViewer />
+          </Grid>
+        </Grid>
       </Box>
     </Box>
   );
