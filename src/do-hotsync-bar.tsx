@@ -2,7 +2,7 @@ import { Box, FormControl, InputLabel, Select, MenuItem, Button } from "@mui/mat
 import { observer } from "mobx-react";
 import SyncIcon from "@mui/icons-material/Sync";
 import { runSync } from "./run-sync";
-import { DlpConnection, syncDevice, UpdateClockConduit, UpdateSyncInfoConduit } from "palm-sync";
+import { DlpConnection, DownloadNewResourcesConduit, InstallNewResourcesConduit, SyncDatabasesConduit, syncDevice, UpdateClockConduit, UpdateSyncInfoConduit } from "palm-sync";
 import { WebDatabaseStorageImplementation } from "./database-storage/web-db-stg-impl";
 
 export const DoHotsyncBar = observer(function DoHotsyncBar()
@@ -14,6 +14,9 @@ export const DoHotsyncBar = observer(function DoHotsyncBar()
                 let dbStg = new WebDatabaseStorageImplementation();
 
                 let conduits = [
+                  new SyncDatabasesConduit(),
+                  new DownloadNewResourcesConduit(),
+                  new InstallNewResourcesConduit(),
                   new UpdateClockConduit(),
                   new UpdateSyncInfoConduit(),
                 ];

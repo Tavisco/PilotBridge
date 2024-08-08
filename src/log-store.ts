@@ -23,7 +23,7 @@ class LogStore {
       addLog: action,
       addDivider: action,
     });
-    debug.enable('palm-sync:*,!palm-sync:padp,!palm-sync:dlp');
+    debug.enable('palm-sync:*');
     debug.log = this.addLog.bind(this);
   }
 

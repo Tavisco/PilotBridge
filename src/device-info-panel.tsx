@@ -35,7 +35,7 @@ export const DeviceInfoPanel = observer(function DeviceInfoPanel(
               ['OS version', sysInfo.romSWVersion.toString()],
               ['DLP version', sysInfo.dlpVer.toString()],
               ['User name', userInfo.userName || 'N/A'],
-              ['Last sync PC ID', userInfo.lastSyncPc],
+              ['Last sync PC ID', `${userInfo.lastSyncPc}`],
               ['User ID', userInfo.userId],
               ['Last sync', userInfo.lastSyncDate.toLocaleString()],
               ['Last sync succ', userInfo.succSyncDate.toLocaleString()],
@@ -60,7 +60,7 @@ export const DeviceInfoPanel = observer(function DeviceInfoPanel(
               >
                 {label}
               </Typography>
-              <Typography variant="body2" component="span">
+              <Typography variant="caption" component="span">
                 {value}
               </Typography>
             </Box>

@@ -15,17 +15,19 @@
     "@fontsource/inter": "^5.0.19",
     "@mui/icons-material": "^5.15.21",
     "@mui/material": "^5.16.0",
-    "memfs": "^4.9.3",
+    "memfs": "^4.11.1",
     "mobx": "^6.13.0",
     "mobx-react": "^9.1.1",
     "palm-pdb": "^0.2.2",
     "palm-sync": "file:../palm-sync",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "uuid": "^10.0.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
+    "@types/uuid": "^10.0.0",
     "@typescript-eslint/eslint-plugin": "^7.15.0",
     "@typescript-eslint/parser": "^7.15.0",
     "@vitejs/plugin-react": "^4.3.1",
