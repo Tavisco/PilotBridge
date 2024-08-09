@@ -1,27 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  Card,
-  CardContent,
-  CardActions,
   Button,
-  Typography,
   Box,
   List,
   ListItem,
   ListItemText,
   IconButton,
   ListItemIcon,
+  PaperProps,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
-import BoltIcon from "@mui/icons-material/Bolt";
-import { runSync } from "./../run-sync";
-import { DlpConnection, writeDb } from "palm-sync";
-import {
-  DatabaseHdrType,
-  RawPdbDatabase,
-  RawPrcDatabase,
-  RsrcEntryType,
-} from "palm-pdb";
+import { DlpReadUserInfoRespType } from "palm-sync";
+import { RawPdbDatabase, RawPrcDatabase, RsrcEntryType } from "palm-pdb";
+import { Panel } from "../panel";
+import { WebDatabaseStorageImplementation } from "../database-storage/web-db-stg-impl";
 
 interface TAIBBitmap {
   width: number;
@@ -35,22 +27,9 @@ interface TAIBBitmap {
   data: Uint8Array;
 }
 
-interface TAIBHeader {
-  bitmaps: TAIBBitmap[];
-}
-
-const extractTAIBResource = async (file: File): Promise<TAIBHeader | null> => {
-  let arrayBuffer = await file.arrayBuffer();
-  let dataView = new DataView(arrayBuffer);
-
-  // Assuming you have code here to parse the database and get the correct element.
-  const arrbuf = await file.arrayBuffer();
-  const buffer = Buffer.from(arrbuf);
-  const header = DatabaseHdrType.from(buffer);
-  const rawDb = header.attributes.resDB
-    ? RawPrcDatabase.from(buffer)
-    : RawPdbDatabase.from(buffer);
-
+const extractTAIBResource = (
+  rawDb: RawPdbDatabase | RawPrcDatabase
+): TAIBBitmap => {
   let element;
   for (let index = 0; index < rawDb.records.length; index++) {
     const record = rawDb.records[index];
@@ -62,11 +41,21 @@ const extractTAIBResource = async (file: File): Promise<TAIBHeader | null> => {
   }
 
   if (!element) {
-    return null; // No "tAIB" resource found.
+    return {
+      width: 0,
+      height: 0,
+      rowBytes: 0,
+      flags: 0,
+      pixelSize: 0,
+      version: 0,
+      transparentIndex: 0,
+      compressionType: 0,
+      data: new Uint8Array(),
+    }; // No "tAIB" resource found.
   }
 
-  dataView = new DataView(element.data.buffer);
-  arrayBuffer = element.data.buffer;
+  let dataView = new DataView(element.data.buffer);
+  let arrayBuffer = element.data.buffer;
 
   const bitmaps: TAIBBitmap[] = [];
 
@@ -94,7 +83,7 @@ const extractTAIBResource = async (file: File): Promise<TAIBHeader | null> => {
 
     const data = new Uint8Array(arrayBuffer, dataStart, dataLength);
 
-    bitmaps.push({
+    return {
       width,
       height,
       rowBytes,
@@ -104,26 +93,37 @@ const extractTAIBResource = async (file: File): Promise<TAIBHeader | null> => {
       transparentIndex,
       compressionType,
       data,
-    });
+    };
 
     // Early return to only get the first bitmap because
     // the rest of the code is not prepared to handle
     // multiple images
-    return { bitmaps };
+    // return { bitmaps };
 
-    offset += bitmapHeaderSize + dataLength;
+    // offset += bitmapHeaderSize + dataLength;
 
-    if (nextDepthOffset === 0) {
-      break;
-    }
+    // if (nextDepthOffset === 0) {
+    //   break;
+    // }
 
     // Update offset to the next bitmap's header
-    offset = dataStart + nextDepthOffset * 4;
+    // offset = dataStart + nextDepthOffset * 4;
   }
 
-  console.log(bitmaps);
+  return {
+    width: 0,
+    height: 0,
+    rowBytes: 0,
+    flags: 0,
+    pixelSize: 0,
+    version: 0,
+    transparentIndex: 0,
+    compressionType: 0,
+    data: new Uint8Array(),
+  };
+  // console.log(bitmaps);
 
-  return { bitmaps };
+  // return { bitmaps };
 };
 
 const drawTAIBBitmap = (canvas: HTMLCanvasElement, bitmap: TAIBBitmap) => {
@@ -171,7 +171,6 @@ const drawTAIBBitmap = (canvas: HTMLCanvasElement, bitmap: TAIBBitmap) => {
   ctx.putImageData(imageData, 0, 0);
 };
 
-// Example React component
 const BitmapCanvas: React.FC<{ bitmap: TAIBBitmap }> = ({ bitmap }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -184,29 +183,26 @@ const BitmapCanvas: React.FC<{ bitmap: TAIBBitmap }> = ({ bitmap }) => {
   return <canvas ref={canvasRef}></canvas>;
 };
 
-function formatBytes(bytes: number, decimals = 2): string {
-  if (bytes === 0) return "0 Bytes";
+export function InstallAppPanel(props: PaperProps) {
+  const [filenames, setFilenames] = useState<string[]>([]);
+  const [appNames, setAppNames] = useState<string[]>([]);
+  const [bitmaps, setBitmaps] = useState<TAIBBitmap[]>([]);
 
-  const k = 1024;
-  const dm = decimals < 0 ? 0 : decimals;
-  const sizes = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
+  // const [databases, setDatabases] = useState<{[filename: string]: RawPdbDatabase | RawPrcDatabase}>({});
 
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  const dbStg = new WebDatabaseStorageImplementation();
 
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
-}
+  async function renderFiles() {
+    const asdf = new DlpReadUserInfoRespType();
+    asdf.userName = "TaviscoVisor";
+    let { databases, filenames } = await dbStg.getDatabasesFromInstallList(
+      asdf
+    );
 
-const getAppName = async (file: File): Promise<string> => {
-  const arrbuf = await file.arrayBuffer();
-  const buffer = Buffer.from(arrbuf);
-  const header = DatabaseHdrType.from(buffer);
-  return header.name;
-};
-
-export function InstallAppPanel() {
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [fileNames, setFileNames] = useState<{ [key: string]: string }>({});
-  const [bitmaps, setBitmaps] = useState<{ [key: string]: TAIBBitmap[] }>({});
+    setAppNames(databases.flatMap((db) => db.header.name));
+    setFilenames(filenames);
+    setBitmaps(databases.flatMap((db) => extractTAIBResource(db)));
+  }
 
   const handleFileChange = async (
     event: React.ChangeEvent<HTMLInputElement>
@@ -217,81 +213,35 @@ export function InstallAppPanel() {
         (file) => file.name.endsWith(".prc") || file.name.endsWith(".pdb")
       );
 
-      const newFileNames: { [key: string]: string } = {};
-      const newBitmaps: { [key: string]: TAIBBitmap[] } = {};
-
       for (const file of validFiles) {
-        const appName = await getAppName(file);
-        newFileNames[file.name] = appName;
-
-        const taibHeader = await extractTAIBResource(file);
-        if (taibHeader) {
-          newBitmaps[file.name] = taibHeader.bitmaps;
-        }
+        await dbStg.putDatabaseInInstallList("TaviscoVisor", file);
       }
 
-      // Merge new file names with existing ones
-      setFileNames((prevFileNames) => ({
-        ...prevFileNames,
-        ...newFileNames,
-      }));
-
-      // Merge new bitmaps with existing ones
-      setBitmaps((prevBitmaps) => ({
-        ...prevBitmaps,
-        ...newBitmaps,
-      }));
-
-      setSelectedFiles((prevFiles) => [...prevFiles, ...validFiles]);
+      renderFiles();
     }
   };
 
-  const handleRemoveFile = (index: number) => {
-    setSelectedFiles((prevFiles) => {
-      const updatedFiles = prevFiles.filter((_, i) => i !== index);
-      const updatedFileNames = updatedFiles.reduce((acc, file) => {
-        acc[file.name] = fileNames[file.name] || "";
-        return acc;
-      }, {} as { [key: string]: string });
-      setFileNames(updatedFileNames);
-
-      // Filter out bitmaps for the removed files
-      const updatedBitmaps = Object.keys(bitmaps).reduce((acc, fileName) => {
-        if (updatedFiles.find((file) => file.name === fileName)) {
-          acc[fileName] = bitmaps[fileName];
-        }
-        return acc;
-      }, {} as { [key: string]: TAIBBitmap[] });
-
-      setBitmaps(updatedBitmaps);
-
-      return updatedFiles;
-    });
+  const handleRemoveFile = async (index: number) => {
+    await dbStg.removeDatabaseBeforeInstallFromList(
+      "TaviscoVisor",
+      filenames[index]
+    );
+    renderFiles();
   };
 
-  const handleGoClick = async () => {
-    await runSync(async (dlpConnection: DlpConnection) => {
-      for (const file of selectedFiles) {
-        const arrbuf = await file.arrayBuffer();
-        const buffer = Buffer.from(arrbuf);
-
-        const header = DatabaseHdrType.from(buffer);
-        const rawDb = header.attributes.resDB
-          ? RawPrcDatabase.from(buffer)
-          : RawPdbDatabase.from(buffer);
-
-        await writeDb(dlpConnection, rawDb, { overwrite: true });
-      }
-    });
-  };
+  useEffect(() => {
+    renderFiles();
+  }, []);
 
   return (
-    <Card sx={{ width: "100%"}}>
-      <CardContent>
-        <Typography variant="h6" component="div">
-          Install list
-        </Typography>
-        <Box mt={2}>
+    <Panel
+      title="Install list"
+      isExpandedByDefault={true}
+      {...props}
+      sx={{ width: "100%" }}
+    >
+      <Box>
+        <Box p={2}>
           <Button variant="contained" component="label">
             Select Files
             <input
@@ -304,7 +254,7 @@ export function InstallAppPanel() {
           </Button>
         </Box>
         <List>
-          {selectedFiles.map((file, index) => (
+          {appNames.map((appName, index) => (
             <ListItem
               key={index}
               secondaryAction={
@@ -318,29 +268,16 @@ export function InstallAppPanel() {
               }
             >
               <ListItemIcon>
-                {bitmaps[file.name]?.map((bitmap, bitmapIndex) => (
-                  <BitmapCanvas key={bitmapIndex} bitmap={bitmap} />
-                ))}
+                <BitmapCanvas key={index} bitmap={bitmaps[index]} />
               </ListItemIcon>
               <ListItemText
-                primary={`${fileNames[file.name] || "Loading..."}`}
-                secondary={`${file.name} - ${formatBytes(file.size)}`}
+                primary={`${appName || "Loading..."}`}
+                secondary={`${filenames[index]}`}
               />
             </ListItem>
           ))}
         </List>
-      </CardContent>
-      <CardActions>
-        {/* <Button
-          variant="contained"
-          color="primary"
-          onClick={handleGoClick}
-          disabled={selectedFiles.length === 0}
-          endIcon={<BoltIcon />}
-        >
-          Install
-        </Button> */}
-      </CardActions>
-    </Card>
+      </Box>
+    </Panel>
   );
 }

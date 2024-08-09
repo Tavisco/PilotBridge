@@ -93,7 +93,7 @@ export class WebDatabaseStorageImplementation
     userInfo: DlpReadUserInfoRespType,
     dbName: string
   ): Promise<boolean> {
-    console.log('Checking DB');
+    console.log('Checking DB ' + dbName);
     const root = await navigator.storage.getDirectory();
     const userRoot = await root.getDirectoryHandle(userInfo.userName);
     const backupDir = await userRoot.getDirectoryHandle('backup');
@@ -102,10 +102,8 @@ export class WebDatabaseStorageImplementation
       const file = await backupDir.getFileHandle(dbName);
       const f2 = await file.getFile();
       const exists = f2.size != 0;
-      console.log(exists);
-      return exists;
+      return Promise.resolve(exists);
     } catch (error) {
-      console.log('Not exists');
       return false;
     }
   }
@@ -130,7 +128,7 @@ export class WebDatabaseStorageImplementation
   }
   
   async getDatabasesFromInstallList(
-    userInfo: DlpReadUserInfoRespType
+    userInfo: DlpReadUserInfoRespType,
   ): Promise<{
     databases: Array<RawPdbDatabase | RawPrcDatabase>;
     filenames: string[];
@@ -150,8 +148,6 @@ export class WebDatabaseStorageImplementation
       }
     }
   
-    filenames.sort();
-  
     return { databases, filenames };
   }
   
@@ -160,7 +156,7 @@ export class WebDatabaseStorageImplementation
     db: RawPdbDatabase | RawPrcDatabase,
     filename: string
   ): Promise<void> {
-    console.log('Rm install DB');
+    console.log('Rm install DB ' + filename);
     const root = await navigator.storage.getDirectory();
     const userRoot = await root.getDirectoryHandle(userInfo.userName);
     const installDir = await userRoot.getDirectoryHandle('install');
@@ -180,5 +176,30 @@ export class WebDatabaseStorageImplementation
   private getDbFullName(db: RawPdbDatabase | RawPrcDatabase): string {
     const ext = db.header.attributes.resDB ? 'prc' : 'pdb';
     return `${db.header.name}.${ext}`;
+  }
+
+  async putDatabaseInInstallList(
+    username: string,
+    file: File
+  ): Promise<void> {
+    const root = await navigator.storage.getDirectory();
+    const userRoot = await root.getDirectoryHandle(username);
+    const installDir = await userRoot.getDirectoryHandle('install');
+    const fileHandle = await installDir.getFileHandle(file.name, {
+      create: true,
+    });
+    const writable = await fileHandle.createWritable();
+    await writable.write(await file.arrayBuffer());
+    await writable.close();
+  }
+
+  async removeDatabaseBeforeInstallFromList(
+    username: string,
+    filename: string
+  ) {
+    const root = await navigator.storage.getDirectory();
+    const userRoot = await root.getDirectoryHandle(username);
+    const installDir = await userRoot.getDirectoryHandle('install');
+    await installDir.removeEntry(filename);
   }
 }

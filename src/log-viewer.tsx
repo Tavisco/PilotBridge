@@ -1,4 +1,4 @@
-import Box, { BoxProps } from "@mui/material/Box";
+import Box from "@mui/material/Box";
 import { observer } from "mobx-react";
 import { useEffect, useRef } from "react";
 import { logStore } from "./log-store";
@@ -26,7 +26,7 @@ export const LogViewer = observer(function LogViewer(props: CardProps) {
 
   return (
     <Card variant="outlined" {...props}>
-      <CardContent sx={{ height: "93vh", overflow: "hidden" }}>
+      <CardContent sx={{ height: "92vh", overflow: "hidden" }}>
         <Typography sx={{ fontSize: 16 }} color="text.secondary" gutterBottom>
           Sync log
         </Typography>
