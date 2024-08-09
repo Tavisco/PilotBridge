@@ -10,7 +10,6 @@ export const DoHotsyncBar = observer(function DoHotsyncBar()
     const handleDoSyncClick = async () => {
         return await runSync(async (dlpConnection: DlpConnection) => {
             try {
-                const user = "TaviscoVisor" as string;
                 let dbStg = new WebDatabaseStorageImplementation();
 
                 let conduits = [
@@ -21,7 +20,7 @@ export const DoHotsyncBar = observer(function DoHotsyncBar()
                   new UpdateSyncInfoConduit(),
                 ];
 
-                return await syncDevice(dlpConnection, user, dbStg, conduits);
+                return await syncDevice(dlpConnection, "TaviscoVisor", dbStg, conduits);
             } catch (error) {
                 console.error(error);
             }

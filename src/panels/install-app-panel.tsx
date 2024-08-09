@@ -193,10 +193,8 @@ export function InstallAppPanel(props: PaperProps) {
   const dbStg = new WebDatabaseStorageImplementation();
 
   async function renderFiles() {
-    const asdf = new DlpReadUserInfoRespType();
-    asdf.userName = "TaviscoVisor";
     let { databases, filenames } = await dbStg.getDatabasesFromInstallList(
-      asdf
+      'TaviscoVisor'
     );
 
     setAppNames(databases.flatMap((db) => db.header.name));

@@ -1,5 +1,5 @@
 import { DatabaseHdrType, RawPdbDatabase, RawPrcDatabase } from "palm-pdb";
-import { DatabaseStorageInterface, DlpReadUserInfoRespType } from "palm-sync";
+import { DatabaseStorageInterface } from "palm-sync";
 import { v4 as uuidv4 } from 'uuid';
 
 
@@ -45,12 +45,12 @@ export class WebDatabaseStorageImplementation
   }
   
   async writeDatabaseToStorage(
-    userInfo: DlpReadUserInfoRespType,
+    requestedUserName: string,
     db: RawPdbDatabase | RawPrcDatabase
   ): Promise<void> {
     console.log('Writting DB');
     const root = await navigator.storage.getDirectory();
-    const userRoot = await root.getDirectoryHandle(userInfo.userName);
+    const userRoot = await root.getDirectoryHandle(requestedUserName);
     const backupDir = await userRoot.getDirectoryHandle('backup');
     const fileHandle = await backupDir.getFileHandle(this.getDbFullName(db), {
       create: true,
@@ -61,12 +61,12 @@ export class WebDatabaseStorageImplementation
   }
   
   async readDatabaseFromStorage(
-    userInfo: DlpReadUserInfoRespType,
+    requestedUserName: string,
     dbName: string
   ): Promise<RawPdbDatabase | RawPrcDatabase> {
     console.log('Reading DB');
     const root = await navigator.storage.getDirectory();
-    const userRoot = await root.getDirectoryHandle(userInfo.userName);
+    const userRoot = await root.getDirectoryHandle(requestedUserName);
     const backupDir = await userRoot.getDirectoryHandle('backup');
     let fileHandle;
     
@@ -90,12 +90,12 @@ export class WebDatabaseStorageImplementation
   }
   
   async databaseExistsInStorage(
-    userInfo: DlpReadUserInfoRespType,
+    requestedUserName: string,
     dbName: string
   ): Promise<boolean> {
     console.log('Checking DB ' + dbName);
     const root = await navigator.storage.getDirectory();
-    const userRoot = await root.getDirectoryHandle(userInfo.userName);
+    const userRoot = await root.getDirectoryHandle(requestedUserName);
     const backupDir = await userRoot.getDirectoryHandle('backup');
 
     try {
@@ -109,17 +109,17 @@ export class WebDatabaseStorageImplementation
   }
   
   async getAllDatabasesFromStorage(
-    userInfo: DlpReadUserInfoRespType
+    requestedUserName: string,
   ): Promise<Array<RawPdbDatabase | RawPrcDatabase>> {
-    console.log('Get all DB');
+    console.log(`Get all DB for [${requestedUserName}]`);
     const root = await navigator.storage.getDirectory();
-    const userRoot = await root.getDirectoryHandle(userInfo.userName);
+    const userRoot = await root.getDirectoryHandle(requestedUserName);
     const backupDir = await userRoot.getDirectoryHandle('backup');
     const databases: Array<RawPdbDatabase | RawPrcDatabase> = [];
   
     for await (const entry of (backupDir as any).values()) {
       if (entry.kind === 'file') {
-        const db = await this.readDatabaseFromStorage(userInfo, entry.name);
+        const db = await this.readDatabaseFromStorage(requestedUserName, entry.name);
         databases.push(db);
       }
     }
@@ -128,21 +128,21 @@ export class WebDatabaseStorageImplementation
   }
   
   async getDatabasesFromInstallList(
-    userInfo: DlpReadUserInfoRespType,
+    requestedUserName: string,
   ): Promise<{
     databases: Array<RawPdbDatabase | RawPrcDatabase>;
     filenames: string[];
   }> {
     console.log('Get install DB');
     const root = await navigator.storage.getDirectory();
-    const userRoot = await root.getDirectoryHandle(userInfo.userName);
+    const userRoot = await root.getDirectoryHandle(requestedUserName);
     const installDir = await userRoot.getDirectoryHandle('install');
     const databases: Array<RawPdbDatabase | RawPrcDatabase> = [];
     const filenames: string[] = [];
   
     for await (const entry of (installDir as any).values()) {
       if (entry.kind === 'file' && (entry.name.endsWith('.prc') || entry.name.endsWith('.pdb'))) {
-        const db = await this.readDatabaseFromStorage(userInfo, entry.name);
+        const db = await this.readDatabaseFromStorage(requestedUserName, entry.name);
         databases.push(db);
         filenames.push(entry.name);
       }
@@ -152,13 +152,13 @@ export class WebDatabaseStorageImplementation
   }
   
   async removeDatabaseFromInstallList(
-    userInfo: DlpReadUserInfoRespType,
+    requestedUserName: string,
     db: RawPdbDatabase | RawPrcDatabase,
     filename: string
   ): Promise<void> {
     console.log('Rm install DB ' + filename);
     const root = await navigator.storage.getDirectory();
-    const userRoot = await root.getDirectoryHandle(userInfo.userName);
+    const userRoot = await root.getDirectoryHandle(requestedUserName);
     const installDir = await userRoot.getDirectoryHandle('install');
     const backupDir = await userRoot.getDirectoryHandle('backup');
   
