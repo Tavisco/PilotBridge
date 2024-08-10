@@ -37,9 +37,11 @@ import FileUploadIcon from "@mui/icons-material/FileUpload";
 import InfoIcon from "@mui/icons-material/Info";
 import InstallMobileIcon from "@mui/icons-material/InstallMobile";
 import ScienceIcon from "@mui/icons-material/Science";
+import HelpIcon from '@mui/icons-material/Help';
 import { LogViewer } from "./log-viewer";
 import { ManagerUsersPanel } from "./panels/manage-users-panel";
 import { AboutPanel } from "./panels/about-panel";
+import { HelpPanel } from "./panels/help-panel";
 
 function UnsupportedApisBanner() {
   return (
@@ -120,7 +122,7 @@ const ConnectionSelector = observer(function ConnectionSelector() {
 
 export function App() {
   const [mobileOpen, setMobileOpen] = React.useState(false);
-  const [currentComponent, setCurrentComponent] = React.useState("hotsync");
+  const [currentComponent, setCurrentComponent] = React.useState("help");
   const drawerWidth = 240;
 
   const handleDrawerToggle = () => {
@@ -142,6 +144,17 @@ export function App() {
         </Toolbar>
         <Divider />
         <List>
+          <ListItem key="help" disablePadding>
+            <ListItemButton
+              selected={currentComponent === "help"}
+              onClick={() => handleListItemClick("help")}
+            >
+              <ListItemIcon>
+                <HelpIcon />
+              </ListItemIcon>
+              <ListItemText primary="Help" />
+            </ListItemButton>
+          </ListItem>
           <ListItem key="calendar" disablePadding>
             <ListItemButton
               selected={currentComponent === "calendar"}
@@ -259,6 +272,8 @@ export function App() {
 
   const renderComponent = () => {
     switch (currentComponent) {
+      case "help":
+        return <HelpPanel />;
       case "calendar":
         return <div>WIP Calendar</div>;
       case "address":
@@ -278,7 +293,7 @@ export function App() {
       case "about":
         return <AboutPanel />;
       default:
-        return <InstallAppPanel />;
+        return <HelpPanel />;
     }
   };
 
