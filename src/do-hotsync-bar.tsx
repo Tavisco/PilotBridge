@@ -74,6 +74,8 @@ export const DoHotsyncBar = observer(function DoHotsyncBar() {
   }
 
   const handleDoSyncClick = async () => {
+    const deviceName = prefsStore.get("selectedDevice") as string;
+
     hotsyncEvents.emit(HotsyncEvents.HotsyncStarted);
     setDoingHotsync(true);
 
@@ -86,7 +88,6 @@ export const DoHotsyncBar = observer(function DoHotsyncBar() {
           new UpdateClockConduit(),
           new UpdateSyncInfoConduit(),
         ];
-        const deviceName = prefsStore.get("selectedDevice") as string;
         return await syncDevice(dlpConnection, deviceName, dbStg, conduits);
       });
     } catch (error) {
@@ -148,7 +149,7 @@ export const DoHotsyncBar = observer(function DoHotsyncBar() {
         startIcon={<SyncIcon />}
         sx={{ marginLeft: "10px", width: "14em" }}
         onClick={handleDoSyncClick}
-        disabled={doingHotsync}
+        disabled={doingHotsync || selectedDevice === ''}
       >
         {!doingHotsync ? <a>Hotsync</a> : <a>Syncing...</a>}
       </Button>

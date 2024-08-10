@@ -278,7 +278,7 @@ export function App() {
       case "about":
         return <AboutPanel />;
       default:
-        return null;
+        return <InstallAppPanel />;
     }
   };
 

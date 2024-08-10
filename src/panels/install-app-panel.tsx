@@ -46,12 +46,12 @@ const extractTAIBResource = (
 
   if (!element) {
     return {
-      width: 0,
-      height: 0,
-      rowBytes: 0,
+      width: 22,
+      height: 22,
+      rowBytes: 3,
       flags: 0,
-      pixelSize: 0,
-      version: 0,
+      pixelSize: 1,
+      version: 1,
       transparentIndex: 0,
       compressionType: 0,
       data: new Uint8Array(),
@@ -114,13 +114,18 @@ const extractTAIBResource = (
     // offset = dataStart + nextDepthOffset * 4;
   }
 
+  /**
+   * 
+   * {"width":22,"height":22,"rowBytes":4,"flags":0,"pixelSize":1,"version":1,"data":{"0":0,"1":0,"2":0,"3":0,"4":0,"5":0,"6":0,"7":0,"8":1,"9":255,"10":0,"11":0,"12":2,"13":0,"14":192,"15":0,"16":12,"17":0,"18":96,"19":0,"20":24,"21":0,"22":176,"23":0,"24":31,"25":255,"26":48,"27":0,"28":56,"29":1,"30":56,"31":0,"32":56,"33":1,"34":56,"35":0,"36":120,"37":249,"38":60,"39":0,"40":121,"41":9,"42":60,"43":0,"44":121,"45":249,"46":60,"47":0,"48":120,"49":1,"50":60,"51":0,"52":120,"53":1,"54":60,"55":0,"56":127,"57":255,"58":60,"59":0,"60":120,"61":1,"62":60,"63":0,"64":56,"65":1,"66":56,"67":0,"68":56,"69":249,"70":56,"71":0,"72":25,"73":9,"74":48,"75":0,"76":9,"77":249,"78":112,"79":0,"80":8,"81":1,"82":96,"83":0,"84":8,"85":1,"86":128,"87":0}}
+   */
+
   return {
-    width: 0,
-    height: 0,
-    rowBytes: 0,
+    width: 22,
+    height: 22,
+    rowBytes: 3,
     flags: 0,
-    pixelSize: 0,
-    version: 0,
+    pixelSize: 1,
+    version: 1,
     transparentIndex: 0,
     compressionType: 0,
     data: new Uint8Array(),
