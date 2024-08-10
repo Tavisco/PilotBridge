@@ -1,0 +1,32 @@
+name: publish-website
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: main
+
+      - name: Checkout custom palm-sync repo
+        uses: actions/checkout@v4
+        with:
+          repository: Tavisco/palm-sync
+          path: palm-sync
+          ref: 'feature/fs-abstraction'
+          
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      - run: npm --prefix=./palm-sync install
+      - run: npm --prefix=./palm-sync run build
+      - run: npm --prefix=./main install
+      - run: npm --prefix=./main run build
+      - uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./main/dist

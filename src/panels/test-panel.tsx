@@ -1,12 +1,10 @@
 import Button from "@mui/material/Button";
 import Grid from "@mui/material/Grid";
-import { PaperProps } from "@mui/material/Paper";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { debug, DlpConnection, readDbList } from "palm-sync";
 import { Fragment, useCallback } from "react";
 import { runSync } from "./../run-sync";
-import { Typography } from "@mui/material";
 
 const log = debug("result");
 
@@ -39,7 +37,7 @@ function ListDb() {
   );
 }
 
-export function TestPanel(props: PaperProps) {
+export function TestPanel() {
   const theme = useTheme();
   const isWide = useMediaQuery(theme.breakpoints.up("sm"));
 

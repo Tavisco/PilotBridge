@@ -61,8 +61,6 @@ const extractTAIBResource = (
   let dataView = new DataView(element.data.buffer);
   let arrayBuffer = element.data.buffer;
 
-  const bitmaps: TAIBBitmap[] = [];
-
   let offset = 0;
   while (offset < arrayBuffer.byteLength) {
     const width = dataView.getUint16(offset, false);
@@ -71,7 +69,7 @@ const extractTAIBResource = (
     const flags = dataView.getUint16(offset + 6, false);
     const pixelSize = dataView.getUint8(offset + 8);
     const version = dataView.getUint8(offset + 9);
-    const nextDepthOffset = dataView.getUint16(offset + 10, false);
+    // const nextDepthOffset = dataView.getUint16(offset + 10, false);
 
     let transparentIndex: number | undefined;
     let compressionType: number | undefined;
@@ -139,7 +137,7 @@ const drawTAIBBitmap = (canvas: HTMLCanvasElement, bitmap: TAIBBitmap) => {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
-  const { width, height, rowBytes, pixelSize, data } = bitmap;
+  const { width, height, rowBytes, data } = bitmap;
 
   // Set canvas size to be double the size of the original bitmap
   const newWidth = width * 2;

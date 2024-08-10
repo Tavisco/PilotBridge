@@ -2,7 +2,7 @@ import {action, makeObservable, observable} from 'mobx';
 
 export interface Prefs {
   connectionString: 'usb' | 'serial:web';
-  selectedDevice: '';
+  selectedDevice: string;
 }
 
 function getDefaultConnectionString() {
