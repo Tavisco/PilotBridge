@@ -40,6 +40,10 @@ export function HelpPanel(props: PaperProps) {
                         <ListItem>
                             <ListItemText primary="When I press the hotsync button in the cradle the PDA does not appear in the list" secondary="Follow the instructions provided in the following link to setup the connection correctly: https://github.com/jichu4n/palm-sync/blob/doc/docs/connecting-palm-os-devices.md" />
                         </ListItem>
+                        <Divider component="li" />
+                        <ListItem>
+                            <ListItemText primary="Is my data backuped to a server/cloud?" secondary="No. All data is only stored in your browser's OPFS storage and never leaves it. Everything runs on the client-side (your browser), there is no backend server in play here." />
+                        </ListItem>
                     </List>
                 </div>
             </Box>
