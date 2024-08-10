@@ -14,6 +14,7 @@ import { RawPdbDatabase, RawPrcDatabase, RsrcEntryType } from "palm-pdb";
 import { Panel } from "../panel";
 import { WebDatabaseStorageImplementation } from "../database-storage/web-db-stg-impl";
 import hotsyncEvents, { HotsyncEvents } from "../event-emitter/hotsync-event-emitter";
+import { prefsStore } from "../prefs-store";
 
 interface TAIBBitmap {
   width: number;
@@ -183,23 +184,34 @@ const BitmapCanvas: React.FC<{ bitmap: TAIBBitmap }> = ({ bitmap }) => {
   return <canvas ref={canvasRef}></canvas>;
 };
 
+const dbStg = new WebDatabaseStorageImplementation();
+
 export function InstallAppPanel(props: PaperProps) {
+  const [hasValidUser, setHasValidUser] = useState<boolean>();
   const [filenames, setFilenames] = useState<string[]>([]);
   const [appNames, setAppNames] = useState<string[]>([]);
   const [bitmaps, setBitmaps] = useState<TAIBBitmap[]>([]);
 
   // const [databases, setDatabases] = useState<{[filename: string]: RawPdbDatabase | RawPrcDatabase}>({});
 
-  const dbStg = new WebDatabaseStorageImplementation();
-
   async function renderFiles() {
-    let { databases, filenames } = await dbStg.getDatabasesFromInstallList(
-      'TaviscoVisor'
-    );
+    const deviceName = prefsStore.get("selectedDevice") as string;
 
-    setAppNames(databases.flatMap((db) => db.header.name));
-    setFilenames(filenames);
-    setBitmaps(databases.flatMap((db) => extractTAIBResource(db)));
+    try {
+      let { databases, filenames } = await dbStg.getDatabasesFromInstallList(
+        deviceName
+      );
+  
+      setAppNames(databases.flatMap((db) => db.header.name));
+      setFilenames(filenames);
+      setBitmaps(databases.flatMap((db) => extractTAIBResource(db)));
+      setHasValidUser(true);
+    } catch (error) {
+      setHasValidUser(false);
+      setFilenames([]);
+      setAppNames([]);
+      setBitmaps([]);
+    }
   }
 
   const handleFileChange = async (
@@ -211,8 +223,10 @@ export function InstallAppPanel(props: PaperProps) {
         (file) => file.name.endsWith(".prc") || file.name.endsWith(".pdb")
       );
 
+      const deviceName = prefsStore.get("selectedDevice") as string;
+
       for (const file of validFiles) {
-        await dbStg.putDatabaseInInstallList("TaviscoVisor", file);
+        await dbStg.putDatabaseInInstallList(deviceName, file);
       }
 
       renderFiles();
@@ -220,8 +234,10 @@ export function InstallAppPanel(props: PaperProps) {
   };
 
   const handleRemoveFile = async (index: number) => {
+    const deviceName = prefsStore.get("selectedDevice") as string;
+
     await dbStg.removeDatabaseBeforeInstallFromList(
-      "TaviscoVisor",
+      deviceName,
       filenames[index]
     );
     renderFiles();
@@ -235,9 +251,11 @@ export function InstallAppPanel(props: PaperProps) {
     };
 
     hotsyncEvents.on(HotsyncEvents.HotsyncFinished, handleHotsyncFinished);
+    hotsyncEvents.on(HotsyncEvents.HotsyncUserChanged, handleHotsyncFinished);
 
     return () => {
       hotsyncEvents.off(HotsyncEvents.HotsyncFinished, handleHotsyncFinished);
+      hotsyncEvents.off(HotsyncEvents.HotsyncUserChanged, handleHotsyncFinished);
     };
 
   }, []);
@@ -251,7 +269,7 @@ export function InstallAppPanel(props: PaperProps) {
     >
       <Box>
         <Box p={2}>
-          <Button variant="contained" component="label">
+          <Button variant="contained" component="label" disabled={!hasValidUser}>
             Select Files
             <input
               type="file"

@@ -5,6 +5,7 @@ import {
   Select,
   MenuItem,
   Button,
+  SelectChangeEvent,
 } from "@mui/material";
 import { observer } from "mobx-react";
 import SyncIcon from "@mui/icons-material/Sync";
@@ -22,14 +23,32 @@ import { WebDatabaseStorageImplementation } from "./database-storage/web-db-stg-
 import hotsyncEvents, {
   HotsyncEvents,
 } from "./event-emitter/hotsync-event-emitter";
+import { useEffect, useState } from "react";
+import { prefsStore } from "./prefs-store";
+
+const dbStg = new WebDatabaseStorageImplementation();
 
 export const DoHotsyncBar = observer(function DoHotsyncBar() {
+  const [doingHotsync, setDoingHotsync] = useState(false);
+  const [selectedDevice, setSelectedDevice] = useState("");
+  const [knownDevices, setKnownDevices] = useState<string[]>([]);
+
+  useEffect(() => {
+    async function loadKnownDevices() {
+      setKnownDevices(await dbStg.getAllDevicesNames());
+
+      const lastUsedDevice = prefsStore.get("selectedDevice") as string;
+      setSelectedDevice(lastUsedDevice);
+    }
+    loadKnownDevices();
+  }, []);
+
   const handleDoSyncClick = async () => {
     hotsyncEvents.emit(HotsyncEvents.HotsyncStarted);
-    await runSync(async (dlpConnection: DlpConnection) => {
-      try {
-        let dbStg = new WebDatabaseStorageImplementation();
+    setDoingHotsync(true);
 
+    try {
+      await runSync(async (dlpConnection: DlpConnection) => {
         let conduits = [
           new SyncDatabasesConduit(),
           new DownloadNewResourcesConduit(),
@@ -37,15 +56,23 @@ export const DoHotsyncBar = observer(function DoHotsyncBar() {
           new UpdateClockConduit(),
           new UpdateSyncInfoConduit(),
         ];
+        const deviceName = prefsStore.get("selectedDevice") as string;
+        return await syncDevice(dlpConnection, deviceName, dbStg, conduits);
+      });
+    } catch (error) {
+      console.error(error);
+    }
 
-        return await syncDevice(dlpConnection, "TaviscoVisor", dbStg, conduits);
-      } catch (error) {
-        console.error(error);
-      }
-    });
-
+    setDoingHotsync(false);
     hotsyncEvents.emit(HotsyncEvents.HotsyncFinished);
     return;
+  };
+
+  const handleChange = (event: SelectChangeEvent) => {
+    const deviceName = event.target.value as string;
+    setSelectedDevice(deviceName);
+    prefsStore.set("selectedDevice", deviceName);
+    hotsyncEvents.emit(HotsyncEvents.HotsyncUserChanged);
   };
 
   return (
@@ -55,21 +82,30 @@ export const DoHotsyncBar = observer(function DoHotsyncBar() {
         display: "flex",
       }}
     >
-      <FormControl fullWidth variant="filled" size="small">
+      <FormControl
+        fullWidth
+        variant="filled"
+        size="small"
+        disabled={doingHotsync}
+      >
         <InputLabel id="demo-simple-select-label">Device</InputLabel>
         <Select
           autoWidth
           labelId="demo-simple-select-label"
           id="demo-simple-select"
-          value="20"
+          value={selectedDevice}
           label="Device"
-          // onChange={handleChange}
+          onChange={handleChange}
         >
-          <MenuItem value="">
+          <MenuItem value="add_new_device">
             <em>Add new</em>
           </MenuItem>
-          <MenuItem value={20}>TaviscoVisor</MenuItem>
-          <MenuItem value={30}>TaviscoTX</MenuItem>
+
+          {knownDevices.map((device) => (
+            <MenuItem key={device} value={device}>
+              {device}
+            </MenuItem>
+          ))}
         </Select>
       </FormControl>
       <Button
@@ -79,8 +115,9 @@ export const DoHotsyncBar = observer(function DoHotsyncBar() {
         startIcon={<SyncIcon />}
         sx={{ marginLeft: "10px", width: "14em" }}
         onClick={handleDoSyncClick}
+        disabled={doingHotsync}
       >
-        Do Hotsync
+        {!doingHotsync ? <a>Hotsync</a> : <a>Syncing...</a>}
       </Button>
     </Box>
   );

@@ -25,7 +25,6 @@ import FileUploadIcon from "@mui/icons-material/FileUpload";
 import InfoIcon from "@mui/icons-material/Info";
 import InstallMobileIcon from "@mui/icons-material/InstallMobile";
 import ScienceIcon from "@mui/icons-material/Science";
-import SyncIcon from "@mui/icons-material/Sync";
 import { observer } from "mobx-react";
 import { UsbIcon, SerialIcon } from "./icons";
 import { prefsStore } from "./prefs-store";

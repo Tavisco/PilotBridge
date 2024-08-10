@@ -2,6 +2,7 @@ import {action, makeObservable, observable} from 'mobx';
 
 export interface Prefs {
   connectionString: 'usb' | 'serial:web';
+  selectedDevice: '';
 }
 
 function getDefaultConnectionString() {
@@ -18,6 +19,7 @@ function getDefaultConnectionString() {
 
 export const DEFAULT_PREFS: Prefs = Object.freeze({
   connectionString: getDefaultConnectionString(),
+  selectedDevice: '',
 });
 
 class PrefsStore {

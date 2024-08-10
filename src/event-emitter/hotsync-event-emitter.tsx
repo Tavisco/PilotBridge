@@ -1,9 +1,9 @@
 import { EventEmitter } from 'events';
 
-// Types of events the emitter will handle
 export enum HotsyncEvents {
   HotsyncStarted = 'hotsyncStarted',
-  HotsyncFinished = 'hotsyncFinished'
+  HotsyncFinished = 'hotsyncFinished',
+  HotsyncUserChanged = 'hotsyncUserChanged'
 }
 
 class HotsyncEventEmitter extends EventEmitter {
