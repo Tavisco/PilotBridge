@@ -10,10 +10,10 @@ import {
   PaperProps,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
-import { DlpReadUserInfoRespType } from "palm-sync";
 import { RawPdbDatabase, RawPrcDatabase, RsrcEntryType } from "palm-pdb";
 import { Panel } from "../panel";
 import { WebDatabaseStorageImplementation } from "../database-storage/web-db-stg-impl";
+import hotsyncEvents, { HotsyncEvents } from "../event-emitter/hotsync-event-emitter";
 
 interface TAIBBitmap {
   width: number;
@@ -229,6 +229,17 @@ export function InstallAppPanel(props: PaperProps) {
 
   useEffect(() => {
     renderFiles();
+
+    const handleHotsyncFinished = () => {
+      renderFiles();
+    };
+
+    hotsyncEvents.on(HotsyncEvents.HotsyncFinished, handleHotsyncFinished);
+
+    return () => {
+      hotsyncEvents.off(HotsyncEvents.HotsyncFinished, handleHotsyncFinished);
+    };
+
   }, []);
 
   return (
