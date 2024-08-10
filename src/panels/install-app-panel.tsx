@@ -8,12 +8,15 @@ import {
   IconButton,
   ListItemIcon,
   PaperProps,
+  Typography,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { RawPdbDatabase, RawPrcDatabase, RsrcEntryType } from "palm-pdb";
 import { Panel } from "../panel";
 import { WebDatabaseStorageImplementation } from "../database-storage/web-db-stg-impl";
-import hotsyncEvents, { HotsyncEvents } from "../event-emitter/hotsync-event-emitter";
+import hotsyncEvents, {
+  HotsyncEvents,
+} from "../event-emitter/hotsync-event-emitter";
 import { prefsStore } from "../prefs-store";
 
 interface TAIBBitmap {
@@ -201,7 +204,7 @@ export function InstallAppPanel(props: PaperProps) {
       let { databases, filenames } = await dbStg.getDatabasesFromInstallList(
         deviceName
       );
-  
+
       setAppNames(databases.flatMap((db) => db.header.name));
       setFilenames(filenames);
       setBitmaps(databases.flatMap((db) => extractTAIBResource(db)));
@@ -255,9 +258,11 @@ export function InstallAppPanel(props: PaperProps) {
 
     return () => {
       hotsyncEvents.off(HotsyncEvents.HotsyncFinished, handleHotsyncFinished);
-      hotsyncEvents.off(HotsyncEvents.HotsyncUserChanged, handleHotsyncFinished);
+      hotsyncEvents.off(
+        HotsyncEvents.HotsyncUserChanged,
+        handleHotsyncFinished
+      );
     };
-
   }, []);
 
   return (
@@ -269,7 +274,11 @@ export function InstallAppPanel(props: PaperProps) {
     >
       <Box>
         <Box p={2}>
-          <Button variant="contained" component="label" disabled={!hasValidUser}>
+          <Button
+            variant="contained"
+            component="label"
+            disabled={!hasValidUser}
+          >
             Select Files
             <input
               type="file"
@@ -280,6 +289,26 @@ export function InstallAppPanel(props: PaperProps) {
             />
           </Button>
         </Box>
+        <div>
+          {!hasValidUser && (
+            <div
+              style={{
+                display: "grid",
+                placeContent: "center",
+                textAlign: "center",
+                padding: "2em",
+              }}
+            >
+              <Typography variant="h5" gutterBottom>
+                That's a new device! 🎉
+              </Typography>
+              <Typography variant="body1">
+                Please hotsync it first before installing new software.
+              </Typography>
+            </div>
+          )}
+        </div>
+
         <List>
           {appNames.map((appName, index) => (
             <ListItem
