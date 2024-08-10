@@ -195,6 +195,11 @@ export class WebDatabaseStorageImplementation
     await installDir.removeEntry(filename);
   }
 
+  async removeDevice(username: string): Promise<void> {
+    const rootDir = await this.getRootDirectory();
+    await rootDir.removeEntry(username, {recursive: true});
+  }
+
   async getAllDevicesNames(): Promise<string[]> {
     const rootDir = await this.getRootDirectory();
     const devices: string[] = [];

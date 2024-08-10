@@ -190,7 +190,7 @@ const BitmapCanvas: React.FC<{ bitmap: TAIBBitmap }> = ({ bitmap }) => {
 const dbStg = new WebDatabaseStorageImplementation();
 
 export function InstallAppPanel(props: PaperProps) {
-  const [hasValidUser, setHasValidUser] = useState<boolean>();
+  const [hasValidUser, setHasValidUser] = useState<boolean>(true);
   const [filenames, setFilenames] = useState<string[]>([]);
   const [appNames, setAppNames] = useState<string[]>([]);
   const [bitmaps, setBitmaps] = useState<TAIBBitmap[]>([]);

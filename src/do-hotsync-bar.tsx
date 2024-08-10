@@ -47,20 +47,30 @@ export const DoHotsyncBar = observer(function DoHotsyncBar() {
 
   useEffect(() => {
     async function loadKnownDevices() {
-      setKnownDevices(await dbStg.getAllDevicesNames());
+      const handleLoadKnownDevices = async () => {
+        setKnownDevices(await dbStg.getAllDevicesNames());
 
-      const lastUsedDevice = prefsStore.get("selectedDevice") as string;
-      setSelectedDevice(lastUsedDevice);
+        const lastUsedDevice = prefsStore.get("selectedDevice") as string;
+        setSelectedDevice(lastUsedDevice);
+      };
+
+      hotsyncEvents.on(HotsyncEvents.HotsyncUserChanged, handleLoadKnownDevices);
+      handleLoadKnownDevices();
+
+      return () => {
+        hotsyncEvents.off(HotsyncEvents.HotsyncUserChanged, handleLoadKnownDevices);
+      }
     }
+
     loadKnownDevices();
   }, []);
 
   async function updateSelectedDevice(deviceName: string) {
     setKnownDevices(await dbStg.getAllDevicesNames());
     
-    setSelectedDevice(deviceName);
     prefsStore.set("selectedDevice", deviceName);
-    hotsyncEvents.emit(HotsyncEvents.HotsyncUserChanged);  
+    
+    hotsyncEvents.emit(HotsyncEvents.HotsyncUserChanged);
   }
 
   const handleDoSyncClick = async () => {
@@ -111,13 +121,13 @@ export const DoHotsyncBar = observer(function DoHotsyncBar() {
         size="small"
         disabled={doingHotsync}
       >
-        <InputLabel id="demo-simple-select-label">Device</InputLabel>
+        <InputLabel id="demo-simple-select-label">User</InputLabel>
         <Select
           autoWidth
           labelId="demo-simple-select-label"
           id="demo-simple-select"
           value={selectedDevice}
-          label="Device"
+          label="User"
           onChange={handleChange}
         >
           <MenuItem value={addNewDevicePlaceholder}>
@@ -158,7 +168,7 @@ export const DoHotsyncBar = observer(function DoHotsyncBar() {
           },
         }}
       >
-        <DialogTitle>Add new device</DialogTitle>
+        <DialogTitle>Add new user</DialogTitle>
         <DialogContent>
           <DialogContentText>
             Each PalmOS device should have a unique identifier known as User. If you ever performed a hotsync

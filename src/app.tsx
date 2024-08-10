@@ -20,11 +20,6 @@ import {
   Grid,
 } from "@mui/material";
 import React from "react";
-import MenuIcon from "@mui/icons-material/Menu";
-import FileUploadIcon from "@mui/icons-material/FileUpload";
-import InfoIcon from "@mui/icons-material/Info";
-import InstallMobileIcon from "@mui/icons-material/InstallMobile";
-import ScienceIcon from "@mui/icons-material/Science";
 import { observer } from "mobx-react";
 import { UsbIcon, SerialIcon } from "./icons";
 import { prefsStore } from "./prefs-store";
@@ -36,7 +31,14 @@ import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import ContactsIcon from "@mui/icons-material/Contacts";
 import ChecklistIcon from "@mui/icons-material/Checklist";
 import StickyNote2Icon from "@mui/icons-material/StickyNote2";
+import PeopleIcon from '@mui/icons-material/People';
+import MenuIcon from "@mui/icons-material/Menu";
+import FileUploadIcon from "@mui/icons-material/FileUpload";
+import InfoIcon from "@mui/icons-material/Info";
+import InstallMobileIcon from "@mui/icons-material/InstallMobile";
+import ScienceIcon from "@mui/icons-material/Science";
 import { LogViewer } from "./log-viewer";
+import { ManagerUsersPanel } from "./panels/manage-users-panel";
 
 function UnsupportedApisBanner() {
   return (
@@ -216,6 +218,17 @@ export function App() {
               <ListItemText primary="Testing" />
             </ListItemButton>
           </ListItem>
+          <ListItem key="users" disablePadding>
+            <ListItemButton
+              selected={currentComponent === "users"}
+              onClick={() => handleListItemClick("users")}
+            >
+              <ListItemIcon>
+                <PeopleIcon />
+              </ListItemIcon>
+              <ListItemText primary="Users" />
+            </ListItemButton>
+          </ListItem>
           <ListItem key="about" disablePadding>
             <ListItemButton
               selected={currentComponent === "about"}
@@ -247,12 +260,20 @@ export function App() {
     switch (currentComponent) {
       case "calendar":
         return <div>WIP Calendar</div>;
+      case "address":
+        return <div>WIP Adress</div>;
+      case "todo":
+        return <div>WIP ToDo</div>;
+      case "memo":
+        return <div>WIP Memo</div>;
       case "install":
         return <InstallAppPanel />;
       case "retrieve":
         return <div>WIP Retrieve app</div>;
       case "testing":
         return <TestPanel />;
+      case "users":
+        return <ManagerUsersPanel />;
       case "about":
         return <div>WIP Info</div>;
       default:
