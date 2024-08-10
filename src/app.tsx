@@ -39,6 +39,7 @@ import InstallMobileIcon from "@mui/icons-material/InstallMobile";
 import ScienceIcon from "@mui/icons-material/Science";
 import { LogViewer } from "./log-viewer";
 import { ManagerUsersPanel } from "./panels/manage-users-panel";
+import { AboutPanel } from "./panels/about-panel";
 
 function UnsupportedApisBanner() {
   return (
@@ -275,7 +276,7 @@ export function App() {
       case "users":
         return <ManagerUsersPanel />;
       case "about":
-        return <div>WIP Info</div>;
+        return <AboutPanel />;
       default:
         return null;
     }
