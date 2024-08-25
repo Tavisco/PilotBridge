@@ -22,7 +22,6 @@ export function HelpPanel(props: PaperProps) {
             <Box>
                 <div
                     style={{
-                        height: "36vh",
                         display: "grid",
                         placeContent: "center",
                         padding: "2em",
