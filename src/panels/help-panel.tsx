@@ -33,7 +33,7 @@ export function HelpPanel(props: PaperProps) {
                         </ListItem>
                         <Divider component="li" />
                         <ListItem>
-                            <ListItemText primary="How to start a Hotsync" secondary="Select the User in the dropdown and insert the PDA in the cradle, then, click the green 'Hotsync' buttom at the top right, a pop-up prompting to select a device will appear. At this moment press the hotsync button in the cradle, which will cause the PDA to appear in the list, select it and click 'Connect'. The hotsync will start."/>
+                            <ListItemText primary="How to start a Hotsync" secondary="In the bottom left of the screen, make sure to select the correct conenction method (USB or Serial). Select the User in the dropdown and insert the PDA in the cradle, then, click the green 'Hotsync' buttom at the top right, a pop-up prompting to select a device will appear. At this moment press the hotsync button in the cradle, which will cause the PDA to appear in the list, select it and click 'Connect'. The hotsync will start."/>
                         </ListItem>
                         <Divider component="li" />
                         <ListItem>

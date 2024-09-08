@@ -1,6 +1,5 @@
 import { PaperProps } from "@mui/material/Paper";
 import { Box, IconButton, List, ListItem, ListItemText } from "@mui/material";
-import { Panel } from "../panel";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { useEffect, useState } from "react";
 import { WebDatabaseStorageImplementation } from "../database-storage/web-db-stg-impl";
@@ -28,34 +27,27 @@ export function ManagerUsersPanel(props: PaperProps) {
   };
 
   return (
-    <Panel
-      title="Manage Users"
-      isExpandedByDefault={true}
-      {...props}
-      sx={{ width: "100%" }}
-    >
-      <Box>
-        <List>
-          {usernames.map((username) => (
-            <ListItem
-              key={username}
-              secondaryAction={
-                <IconButton
-                  edge="end"
-                  aria-label="delete"
-                  onClick={() => handleDeleteUsername(username)}
-                >
-                  <DeleteIcon />
-                </IconButton>
-              }
-            >
-              <ListItemText
-                primary={username}
-              />
-            </ListItem>
-          ))}
-        </List>
-      </Box>
-    </Panel>
+    <Box>
+      <List>
+        {usernames.map((username) => (
+          <ListItem
+            key={username}
+            secondaryAction={
+              <IconButton
+                edge="end"
+                aria-label="delete"
+                onClick={() => handleDeleteUsername(username)}
+              >
+                <DeleteIcon />
+              </IconButton>
+            }
+          >
+            <ListItemText
+              primary={username}
+            />
+          </ListItem>
+        ))}
+      </List>
+    </Box>
   );
 }
