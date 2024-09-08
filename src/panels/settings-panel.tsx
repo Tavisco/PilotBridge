@@ -15,7 +15,7 @@ import { TestPanel } from "./test-panel";
 export function SettingsPanel(props: PaperProps) {
   const [value, setValue] = useState('users');
 
-  const handleChange = (event: React.SyntheticEvent, newValue: string) => {
+  const handleChange = (_event: React.SyntheticEvent, newValue: string) => {
     setValue(newValue);
   };
 
@@ -29,14 +29,13 @@ export function SettingsPanel(props: PaperProps) {
       <Box>
         <div
           style={{
-            height: "30vh",
             padding: "2em",
             paddingTop: "0em"
           }}
         >
           <TabContext value={value}>
             <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-              <TabList onChange={handleChange} aria-label="lab API tabs example">
+              <TabList onChange={handleChange} aria-label="Settings tabs" centered>
                 <Tab icon={<PeopleIcon />} iconPosition="start" label="Users" value="users" />
                 <Tab icon={<SaveIcon />} iconPosition="start" label="Data" value="data" />
                 <Tab icon={<ScienceIcon />} iconPosition="start" label="Testing" value="testing" />

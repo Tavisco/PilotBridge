@@ -1,4 +1,3 @@
-import { PaperProps } from "@mui/material/Paper";
 import { Box, IconButton, List, ListItem, ListItemText } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { useEffect, useState } from "react";
@@ -6,7 +5,7 @@ import { WebDatabaseStorageImplementation } from "../database-storage/web-db-stg
 import { prefsStore } from "../prefs-store";
 import hotsyncEvents, { HotsyncEvents } from "../event-emitter/hotsync-event-emitter";
 
-export function ManagerUsersPanel(props: PaperProps) {
+export function ManagerUsersPanel() {
   const [usernames, setUsernames] = useState<string[]>([]);
 
   const dbStg = new WebDatabaseStorageImplementation();

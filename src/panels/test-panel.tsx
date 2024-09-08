@@ -1,10 +1,10 @@
 import Button from "@mui/material/Button";
-import Grid from "@mui/material/Grid";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { debug, DlpConnection, readDbList } from "palm-sync";
 import { Fragment, useCallback } from "react";
 import { runSync } from "./../run-sync";
+import { Grid2 } from "@mui/material";
 
 const log = debug("result");
 
@@ -44,21 +44,19 @@ export function TestPanel() {
   const controls = [NoOp, ListDb];
 
   return (
-    <Grid container spacing={1} p={2} justifyContent="center">
-      <Grid item xs={12} />
+    <Grid2 container spacing={1} p={2} justifyContent="center">
+      <Grid2 size={{ xs: 12 }}/>
       {controls.map((Component, idx) => (
         <Fragment key={idx}>
-          <Grid
-            item
-            xs={4}
-            sm={5}
+          <Grid2
+            size={{ xs: 4, sm: 5 }}
             {...(!isWide && idx > 0 ? { sx: { marginLeft: 1 } } : {})}
           >
             <Component />
-          </Grid>
-          {isWide && <Grid item xs={12} />}
+          </Grid2>
+          {isWide && <Grid2 size={{ xs: 12 }} />}
         </Fragment>
       ))}
-    </Grid>
+    </Grid2>
   );
 }
