@@ -24,24 +24,17 @@ import { observer } from "mobx-react";
 import { UsbIcon, SerialIcon } from "./icons";
 import { prefsStore } from "./prefs-store";
 import { InstallAppPanel } from "./panels/install-app-panel";
-import { TestPanel } from "./panels/test-panel";
 import { DeviceInfoPanel } from "./device-info-panel";
 import { DoHotsyncBar } from "./do-hotsync-bar";
-import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
-import ContactsIcon from "@mui/icons-material/Contacts";
-import ChecklistIcon from "@mui/icons-material/Checklist";
-import StickyNote2Icon from "@mui/icons-material/StickyNote2";
-import PeopleIcon from '@mui/icons-material/People';
+import SettingsIcon from '@mui/icons-material/Settings';
 import MenuIcon from "@mui/icons-material/Menu";
-import FileUploadIcon from "@mui/icons-material/FileUpload";
 import InfoIcon from "@mui/icons-material/Info";
 import InstallMobileIcon from "@mui/icons-material/InstallMobile";
-import ScienceIcon from "@mui/icons-material/Science";
-import HelpIcon from '@mui/icons-material/Help';
+import HomeIcon from '@mui/icons-material/Home';
 import { LogViewer } from "./log-viewer";
-import { ManagerUsersPanel } from "./panels/manage-users-panel";
 import { AboutPanel } from "./panels/about-panel";
-import { HelpPanel } from "./panels/help-panel";
+import { HomePanel } from "./panels/home-panel";
+import { SettingsPanel } from "./panels/settings-panel";
 
 function UnsupportedApisBanner() {
   return (
@@ -58,8 +51,8 @@ function UnsupportedApisBanner() {
         WebUSB and Web Serial APIs are not enabled.
       </Typography>
       <Typography variant="body1">
-        Please use a Chromium-based browser, ensure WebUSB or Web Serial
-        functionality are enabled, and open this page over HTTPS.
+        Please use a browser that supports it (Chromium-based ones does),
+        ensure WebUSB or Web Serial functionality are enabled, and open this page over HTTPS.
       </Typography>
     </div>
   );
@@ -144,18 +137,18 @@ export function App() {
         </Toolbar>
         <Divider />
         <List>
-          <ListItem key="help" disablePadding>
+          <ListItem key="home" disablePadding>
             <ListItemButton
-              selected={currentComponent === "help"}
-              onClick={() => handleListItemClick("help")}
+              selected={currentComponent === "home"}
+              onClick={() => handleListItemClick("home")}
             >
               <ListItemIcon>
-                <HelpIcon />
+                <HomeIcon />
               </ListItemIcon>
-              <ListItemText primary="Help" />
+              <ListItemText primary="Home" />
             </ListItemButton>
           </ListItem>
-          <ListItem key="calendar" disablePadding>
+          {/* <ListItem key="calendar" disablePadding>
             <ListItemButton
               selected={currentComponent === "calendar"}
               onClick={() => handleListItemClick("calendar")}
@@ -165,8 +158,8 @@ export function App() {
               </ListItemIcon>
               <ListItemText primary="Calendar" />
             </ListItemButton>
-          </ListItem>
-          <ListItem key="address" disablePadding>
+          </ListItem> */}
+          {/* <ListItem key="address" disablePadding>
             <ListItemButton
               selected={currentComponent === "address"}
               onClick={() => handleListItemClick("address")}
@@ -198,8 +191,8 @@ export function App() {
               </ListItemIcon>
               <ListItemText primary="Memo" />
             </ListItemButton>
-          </ListItem>
-          <ListItem key="simple-install" disablePadding>
+          </ListItem> */}
+          <ListItem key="install-app" disablePadding>
             <ListItemButton
               selected={currentComponent === "install"}
               onClick={() => handleListItemClick("install")}
@@ -210,7 +203,7 @@ export function App() {
               <ListItemText primary="Install App" />
             </ListItemButton>
           </ListItem>
-          <ListItem key="simple-retrieve" disablePadding>
+          {/* <ListItem key="retrieve-app" disablePadding>
             <ListItemButton
               selected={currentComponent === "retrieve"}
               onClick={() => handleListItemClick("retrieve")}
@@ -220,27 +213,16 @@ export function App() {
               </ListItemIcon>
               <ListItemText primary="Retrieve App" />
             </ListItemButton>
-          </ListItem>
-          <ListItem key="testing" disablePadding>
+          </ListItem> */}
+          <ListItem key="settings" disablePadding>
             <ListItemButton
-              selected={currentComponent === "testing"}
-              onClick={() => handleListItemClick("testing")}
+              selected={currentComponent === "settings"}
+              onClick={() => handleListItemClick("settings")}
             >
               <ListItemIcon>
-                <ScienceIcon />
+                <SettingsIcon />
               </ListItemIcon>
-              <ListItemText primary="Testing" />
-            </ListItemButton>
-          </ListItem>
-          <ListItem key="users" disablePadding>
-            <ListItemButton
-              selected={currentComponent === "users"}
-              onClick={() => handleListItemClick("users")}
-            >
-              <ListItemIcon>
-                <PeopleIcon />
-              </ListItemIcon>
-              <ListItemText primary="Users" />
+              <ListItemText primary="Settings" />
             </ListItemButton>
           </ListItem>
           <ListItem key="about" disablePadding>
@@ -272,8 +254,8 @@ export function App() {
 
   const renderComponent = () => {
     switch (currentComponent) {
-      case "help":
-        return <HelpPanel />;
+      case "home":
+        return <HomePanel />;
       case "calendar":
         return <div>WIP Calendar</div>;
       case "address":
@@ -286,14 +268,12 @@ export function App() {
         return <InstallAppPanel />;
       case "retrieve":
         return <div>WIP Retrieve app</div>;
-      case "testing":
-        return <TestPanel />;
-      case "users":
-        return <ManagerUsersPanel />;
+      case "settings":
+        return <SettingsPanel />;
       case "about":
         return <AboutPanel />;
       default:
-        return <HelpPanel />;
+        return <HomePanel />;
     }
   };
 
@@ -321,7 +301,7 @@ export function App() {
             <Typography variant="h6" noWrap component="div">
               PilotBridge
               <Typography variant="caption" px={1}>
-                V 0.0.1
+                V 1.2.0
               </Typography>
             </Typography>
           </Box>
