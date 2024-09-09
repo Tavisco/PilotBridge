@@ -1,19 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Dialog, Typography, Button, Box } from "@mui/material";
 import "./hotsync-popup.css"; // Import the CSS file
 
 const HotSyncPopup: React.FC = () => {
   const [open, setOpen] = useState(true);
-  const [animate, setAnimate] = useState(false);
 
-  useEffect(() => {
-    // Set a timer to trigger the animation
-    const timer = setInterval(() => {
-      setAnimate((prev) => !prev);
-    }, 500); // Adjust the interval as needed
-
-    return () => clearInterval(timer);
-  }, []);
 
   return (
     <Dialog open={open} onClose={() => setOpen(false)}>

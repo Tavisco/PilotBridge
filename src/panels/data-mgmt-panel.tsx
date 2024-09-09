@@ -90,7 +90,7 @@ async function createFolderHandleFromPath(rootFolderHandle: FileSystemDirectoryH
 }
 
 async function pickZipFile(): Promise<File> {
-    const [fileHandle] = await window.showOpenFilePicker({
+    const [fileHandle] = await (window as any).showOpenFilePicker({
         types: [{ description: 'Zip Files', accept: { 'application/zip': ['.zip'] } }],
         multiple: false,
     });
