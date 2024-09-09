@@ -30,10 +30,10 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import MenuIcon from "@mui/icons-material/Menu";
 import InfoIcon from "@mui/icons-material/Info";
 import InstallMobileIcon from "@mui/icons-material/InstallMobile";
-import HelpIcon from '@mui/icons-material/Help';
+import HomeIcon from '@mui/icons-material/Home';
 import { LogViewer } from "./log-viewer";
 import { AboutPanel } from "./panels/about-panel";
-import { HelpPanel } from "./panels/help-panel";
+import { HomePanel } from "./panels/home-panel";
 import { SettingsPanel } from "./panels/settings-panel";
 
 function UnsupportedApisBanner() {
@@ -137,15 +137,15 @@ export function App() {
         </Toolbar>
         <Divider />
         <List>
-          <ListItem key="help" disablePadding>
+          <ListItem key="home" disablePadding>
             <ListItemButton
-              selected={currentComponent === "help"}
-              onClick={() => handleListItemClick("help")}
+              selected={currentComponent === "home"}
+              onClick={() => handleListItemClick("home")}
             >
               <ListItemIcon>
-                <HelpIcon />
+                <HomeIcon />
               </ListItemIcon>
-              <ListItemText primary="Help" />
+              <ListItemText primary="Home" />
             </ListItemButton>
           </ListItem>
           {/* <ListItem key="calendar" disablePadding>
@@ -254,8 +254,8 @@ export function App() {
 
   const renderComponent = () => {
     switch (currentComponent) {
-      case "help":
-        return <HelpPanel />;
+      case "home":
+        return <HomePanel />;
       case "calendar":
         return <div>WIP Calendar</div>;
       case "address":
@@ -273,7 +273,7 @@ export function App() {
       case "about":
         return <AboutPanel />;
       default:
-        return <HelpPanel />;
+        return <HomePanel />;
     }
   };
 
@@ -301,7 +301,7 @@ export function App() {
             <Typography variant="h6" noWrap component="div">
               PilotBridge
               <Typography variant="caption" px={1}>
-                V 0.0.2
+                V 1.2.0
               </Typography>
             </Typography>
           </Box>

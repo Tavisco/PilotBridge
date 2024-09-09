@@ -1,0 +1,21 @@
+.icon {
+    width: 40px;
+    height: 40px;
+    background-color: white;
+    border: 1px solid black;
+    margin: 5px;
+    display: inline-block;
+    position: relative;
+  }
+  
+  .animated-icon {
+    background-color: white;
+    border: 1px solid black;
+    width: 40px;
+    height: 40px;
+    margin: 5px;
+    display: inline-block;
+    position: relative;
+    background-image: linear-gradient(to right, blue, red);
+  }
+  

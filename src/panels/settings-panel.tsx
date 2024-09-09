@@ -11,6 +11,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import ScienceIcon from "@mui/icons-material/Science";
 import { ManagerUsersPanel } from "./manage-users-panel";
 import { TestPanel } from "./test-panel";
+import { DataMgmtPanel } from "./data-mgmt-panel";
 
 export function SettingsPanel(props: PaperProps) {
   const [value, setValue] = useState('users');
@@ -42,7 +43,7 @@ export function SettingsPanel(props: PaperProps) {
               </TabList>
             </Box>
             <TabPanel value="users"><ManagerUsersPanel /></TabPanel>
-            <TabPanel value="data">Item Two</TabPanel>
+            <TabPanel value="data"><DataMgmtPanel /></TabPanel>
             <TabPanel value="testing"><TestPanel /></TabPanel>
           </TabContext>
         </div>
