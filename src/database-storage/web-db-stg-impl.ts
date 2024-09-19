@@ -56,10 +56,10 @@ export class WebDatabaseStorageImplementation
     await writable.close();
   }
 
-  async readDatabaseFromStorage(
+  async getDatabaseBuffer(
     requestedUserName: string,
     dbName: string
-  ): Promise<RawPdbDatabase | RawPrcDatabase> {
+  ): Promise<Buffer> {
     console.log("Reading DB");
     const backupDir = await this.getBackupDirectory(requestedUserName);
     let fileHandle;
@@ -78,7 +78,14 @@ export class WebDatabaseStorageImplementation
     }
 
     const file = await fileHandle.getFile();
-    const fileBuffer = Buffer.from(await file.arrayBuffer());
+    return Buffer.from(await file.arrayBuffer());
+  }
+
+  async readDatabaseFromStorage(
+    requestedUserName: string,
+    dbName: string
+  ): Promise<RawPdbDatabase | RawPrcDatabase> {
+    const fileBuffer = await this.getDatabaseBuffer(requestedUserName, dbName);
     const header = DatabaseHdrType.from(fileBuffer);
     return header.attributes.resDB
       ? RawPrcDatabase.from(fileBuffer)

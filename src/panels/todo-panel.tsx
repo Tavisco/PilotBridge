@@ -1,9 +1,19 @@
 import { PaperProps } from "@mui/material/Paper";
-import { Box, Typography } from "@mui/material";
+import { Box } from "@mui/material";
 import { Panel } from "../panel";
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { useEffect, useState } from "react";
+import { ToDoDatabase } from "palm-pdb";
+import { WebDatabaseStorageImplementation } from "../database-storage/web-db-stg-impl";
+import { prefsStore } from "../prefs-store";
 
 const columns: GridColDef<(typeof rows)[number]>[] = [
+    {
+        field: 'completed',
+        headerName: 'Completed',
+        width: 130,
+        editable: false,
+    },
     {
         field: 'priority',
         headerName: 'Priority',
@@ -24,44 +34,63 @@ const columns: GridColDef<(typeof rows)[number]>[] = [
         width: 135,
         editable: true,
     },
-    {
-        field: 'category',
-        headerName: 'Category',
-        type: 'number',
-        width: 150,
-        editable: true,
-    },
-    {
-        field: 'private',
-        headerName: '🔒',
-        type: 'number',
-        width: 90,
-        editable: true,
-    },
-    {
-        field: 'note',
-        headerName: '🗒️',
-        type: 'number',
-        width: 90,
-        editable: true,
-    },
+    // {
+    //     field: 'category',
+    //     headerName: 'Category',
+    //     type: 'number',
+    //     width: 150,
+    //     editable: true,
+    // },
+    // {
+    //     field: 'private',
+    //     headerName: '🔒',
+    //     type: 'number',
+    //     width: 90,
+    //     editable: true,
+    // },
+    // {
+    //     field: 'note',
+    //     headerName: '🗒️',
+    //     type: 'number',
+    //     width: 90,
+    //     editable: true,
+    // },
 ];
 
-const rows = [
-    //   { id: 1, lastName: 'Snow', firstName: 'Jon', age: 14 },
-    //   { id: 2, lastName: 'Lannister', firstName: 'Cersei', age: 31 },
-    //   { id: 3, lastName: 'Lannister', firstName: 'Jaime', age: 31 },
-    //   { id: 4, lastName: 'Stark', firstName: 'Arya', age: 11 },
-    //   { id: 5, lastName: 'Targaryen', firstName: 'Daenerys', age: null },
-    //   { id: 6, lastName: 'Melisandre', firstName: null, age: 150 },
-    //   { id: 7, lastName: 'Clifford', firstName: 'Ferrara', age: 44 },
-    //   { id: 8, lastName: 'Frances', firstName: 'Rossini', age: 36 },
-    //   { id: 9, lastName: 'Roxie', firstName: 'Harvey', age: 65 },
-];
+interface Row {
+    completed: string;
+    id: number;
+    priority: number;
+    description: string;
+    dueDate: string | null; // Use the correct type for 'dueDate'
+}
+
+const dbStg = new WebDatabaseStorageImplementation();
 
 export function TodoPanel(props: PaperProps) {
+    const [rows, setRows] = useState<Row[]>([]);
 
 
+    async function loadToDo() {
+        const selectedDeviceName = prefsStore.get("selectedDevice") as string;
+        const db = ToDoDatabase.from(await dbStg.getDatabaseBuffer(selectedDeviceName, 'ToDoDB.pdb'));
+
+        console.log(db);
+
+        setRows(
+            db.records.map((record, index) => ({
+                completed: record.isCompleted? '✅' : '',
+                id: index,
+                priority: record.priority,
+                description: record.description,
+                dueDate: record.dueDate == null? 'Not set' : record.dueDate.value.toLocaleDateString(),
+            }))
+        );
+    }
+
+    useEffect(() => {
+        loadToDo();
+      }, []);
 
     return (
         <Panel
@@ -94,7 +123,6 @@ export function TodoPanel(props: PaperProps) {
                             },
                         }}
                         pageSizeOptions={[5]}
-                        checkboxSelection
                         disableRowSelectionOnClick
                     />
                 </div>
