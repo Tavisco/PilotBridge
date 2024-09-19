@@ -13,6 +13,7 @@ export function HomePanel(props: PaperProps) {
     };
 
     const changelogData = [
+        { version: '1.3.0', date: 'xxxxxx', changes: ['Add To Do'] },
         { version: '1.2.0', date: '2024-09-08', changes: ['Add data export and import in the settings', 'Remove unimplemented functionality from the menu bar', 'New URL! https://pilotbridge.tavisco.dev/'] },
         { version: '1.1.0', date: '2024-08-22', changes: ['Improve the performance of the first sync'] },
         { version: '1.0.0', date: '2024-08-10', changes: ['Initial release'] },
@@ -21,7 +22,7 @@ export function HomePanel(props: PaperProps) {
 
     return (
         <Box>
-            <Grid2 container spacing={2}>
+            <Grid2 container spacing={2} maxWidth="md">
                 <Grid2 size={12}>
                     <Panel
                         title="Help"
@@ -37,16 +38,16 @@ export function HomePanel(props: PaperProps) {
                                 }}
                             >
                                 <List sx={style}>
+                                <ListItem>
+                                        <ListItemText primary="Setup the USB drivers" secondary="(Only needed if using USB) On windows you need to install the Zadig drivers, the offical Palm Desktop/Aceeca drivers won't work. On Linux, you need to blacklist the visor modules. On MacOS, it should work out of the box. The following link has instructions on how to set up for each platform: https://github.com/jichu4n/palm-sync/blob/doc/docs/connecting-palm-os-devices.md" />
+                                    </ListItem>
+                                    <Divider component="li" />
                                     <ListItem>
-                                        <ListItemText primary="How to get started" secondary="Add a new user clicking in the 'Users' dropdown at the right top, and then select the 'Add new' option." />
+                                        <ListItemText primary="How to get started" secondary="After setting up the drivers (if using USB), add a new user clicking in the 'Users' dropdown at the right top, and then select the 'Add new' option." />
                                     </ListItem>
                                     <Divider component="li" />
                                     <ListItem>
                                         <ListItemText primary="How to start a Hotsync" secondary="In the bottom left of the screen, make sure to select the correct conenction method (USB or Serial). Select the User in the dropdown and insert the PDA in the cradle, then, click the green 'Hotsync' buttom at the top right, a pop-up prompting to select a device will appear. At this moment press the hotsync button in the cradle, which will cause the PDA to appear in the list, select it and click 'Connect'. The hotsync will start." />
-                                    </ListItem>
-                                    <Divider component="li" />
-                                    <ListItem>
-                                        <ListItemText primary="When I press the hotsync button in the cradle the PDA does not appear in the list" secondary="Follow the instructions provided in the following link to setup the connection correctly: https://github.com/jichu4n/palm-sync/blob/doc/docs/connecting-palm-os-devices.md" />
                                     </ListItem>
                                     <Divider component="li" />
                                     <ListItem>
