@@ -28,12 +28,12 @@ export class WebDatabaseStorageImplementation
     return truncatedHash;
   }
 
-  async createUsernameInStorage(requestedUserName: string): Promise<void> {
+  async createUser(requestedUserName: string): Promise<void> {
     await this.getBackupDirectory(requestedUserName, true);
     await this.getInstallDirectory(requestedUserName, true);
   }
 
-  async isUsernameKnownInStorage(requestedUserName: string): Promise<boolean> {
+  async userExists(requestedUserName: string): Promise<boolean> {
     try {
       await this.getBackupDirectory(requestedUserName);
       return true;
@@ -42,7 +42,7 @@ export class WebDatabaseStorageImplementation
     }
   }
 
-  async writeDatabaseToStorage(
+  async writeDatabase(
     requestedUserName: string,
     db: RawPdbDatabase | RawPrcDatabase
   ): Promise<void> {
@@ -81,7 +81,7 @@ export class WebDatabaseStorageImplementation
     return Buffer.from(await file.arrayBuffer());
   }
 
-  async readDatabaseFromStorage(
+  async readDatabase(
     requestedUserName: string,
     dbName: string
   ): Promise<RawPdbDatabase | RawPrcDatabase> {
@@ -92,7 +92,7 @@ export class WebDatabaseStorageImplementation
       : RawPdbDatabase.from(fileBuffer);
   }
 
-  async databaseExistsInStorage(
+  async databaseExists(
     requestedUserName: string,
     dbName: string
   ): Promise<boolean> {
@@ -109,7 +109,7 @@ export class WebDatabaseStorageImplementation
     }
   }
 
-  async getAllDatabasesFromStorage(
+  async getAllDatabases(
     requestedUserName: string
   ): Promise<Array<RawPdbDatabase | RawPrcDatabase>> {
     console.log(`Get all DB for [${requestedUserName}]`);
@@ -118,7 +118,7 @@ export class WebDatabaseStorageImplementation
 
     for await (const entry of (backupDir as any).values()) {
       if (entry.kind === "file") {
-        const db = await this.readDatabaseFromStorage(
+        const db = await this.readDatabase(
           requestedUserName,
           entry.name
         );
@@ -143,7 +143,7 @@ export class WebDatabaseStorageImplementation
         entry.kind === "file" &&
         (entry.name.endsWith(".prc") || entry.name.endsWith(".pdb"))
       ) {
-        const db = await this.readDatabaseFromStorage(
+        const db = await this.readDatabase(
           requestedUserName,
           entry.name
         );
