@@ -3,7 +3,7 @@ import { Box } from "@mui/material";
 import { Panel } from "../panel";
 import { DataGrid, GridActionsCellItem, GridColDef, GridEventListener, GridRowEditStopReasons, GridRowId, GridRowModes, GridRowModesModel, GridRowsProp, GridSlots, GridToolbarContainer } from '@mui/x-data-grid';
 import { useEffect, useState } from "react";
-import { ToDoDatabase } from "palm-pdb";
+import { DatabaseDate, RawPdbDatabase, ToDoAppInfo, ToDoDatabase, ToDoRecord } from "palm-pdb";
 import { WebDatabaseStorageImplementation } from "../database-storage/web-db-stg-impl";
 import { prefsStore } from "../prefs-store";
 import Button from '@mui/material/Button';
@@ -36,7 +36,7 @@ function EditToolbar(props: EditToolbarProps) {
     const { setRows, setRowModesModel } = props;
 
     const handleClick = () => {
-        const tempId = new Date().getTime();
+        const tempId = Math.floor(Math.random() * 129);
         setRows((oldRows) => [
             ...oldRows,
             { completed: false, id: tempId, priority: 1, description: '', dueDate: new Date(), isNew: true },
@@ -57,6 +57,7 @@ function EditToolbar(props: EditToolbarProps) {
 }
 
 export function TodoPanel(props: PaperProps) {
+    const [db, setDb] = useState<ToDoDatabase>(new ToDoDatabase);
     const [rows, setRows] = useState<Row[]>([]);
     const [rowModesModel, setRowModesModel] = useState<GridRowModesModel>({});
 
@@ -75,6 +76,10 @@ export function TodoPanel(props: PaperProps) {
     };
 
     const handleDeleteClick = (id: GridRowId) => () => {
+        db.records = db.records.filter((record) => record.entry.uniqueId !== id);
+        const selectedDeviceName = prefsStore.get("selectedDevice") as string;
+        dbStg.writeDatabase(selectedDeviceName, RawPdbDatabase.from(db.serialize()));
+
         setRows(rows.filter((row) => row.id !== id));
     };
 
@@ -90,9 +95,29 @@ export function TodoPanel(props: PaperProps) {
         }
     };
 
-    const processRowUpdate = (newRow: Row) => {
-        const updatedRow = { ...newRow, isNew: false };
-        setRows(rows.map((row) => (row.id === newRow.id ? updatedRow : row)));
+    const processRowUpdate = (handledRow: Row) => {
+        var dbRecord = handledRow.isNew? new ToDoRecord : db.records.filter((record) => record.entry.uniqueId == handledRow.id)[0]
+        
+        dbRecord.description = handledRow.description;
+        dbRecord.note = handledRow.description;
+        dbRecord.priority = handledRow.priority;
+        dbRecord.isCompleted = handledRow.completed;
+        dbRecord.dueDate = DatabaseDate.of(handledRow.dueDate);
+        dbRecord.entry.uniqueId = handledRow.id;
+        dbRecord.entry.attributes.dirty = true;
+
+        if (handledRow.isNew) {
+            db.records.push(dbRecord);
+            var appInfo = db.appInfo as ToDoAppInfo;
+        }
+        
+        console.log(db);
+
+        const selectedDeviceName = prefsStore.get("selectedDevice") as string;
+        dbStg.writeDatabase(selectedDeviceName, RawPdbDatabase.from(db.serialize()));
+
+        const updatedRow = { ...handledRow, isNew: false };
+        setRows(rows.map((row) => (row.id === handledRow.id ? updatedRow : row)));
         return updatedRow;
     };
 
@@ -181,13 +206,17 @@ export function TodoPanel(props: PaperProps) {
 
     async function loadToDo() {
         const selectedDeviceName = prefsStore.get("selectedDevice") as string;
-        const db = ToDoDatabase.from(await dbStg.getDatabaseBuffer(selectedDeviceName, 'ToDoDB.pdb'));
+        const tempDb = ToDoDatabase.from(await dbStg.getDatabaseBuffer(selectedDeviceName, 'ToDoDB.pdb'));
+        if (tempDb === undefined) {
+            console.log('Failed to load database!');
+            return;
+        }
 
-        console.log(db);
+        setDb(tempDb);
 
         setRows(
-            db.records.map((record, index) => ({
-                id: index,
+            tempDb.records.map(record => ({
+                id: record.entry.uniqueId,
                 isNew: false,
                 completed: record.isCompleted,
                 priority: record.priority,
