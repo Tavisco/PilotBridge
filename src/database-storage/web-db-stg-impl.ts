@@ -46,7 +46,7 @@ export class WebDatabaseStorageImplementation
     requestedUserName: string,
     db: RawPdbDatabase | RawPrcDatabase
   ): Promise<void> {
-    console.log("Writting DB");
+    console.log(`Writing DB for [${requestedUserName}]`);
     const backupDir = await this.getBackupDirectory(requestedUserName);
     const fileHandle = await backupDir.getFileHandle(this.getDbFullName(db), {
       create: true,
@@ -60,7 +60,7 @@ export class WebDatabaseStorageImplementation
     requestedUserName: string,
     dbName: string
   ): Promise<Buffer> {
-    console.log("Reading DB");
+    console.log(`Reading DB [${requestedUserName}]\\[${dbName}]`);
     const backupDir = await this.getBackupDirectory(requestedUserName);
     let fileHandle;
 
