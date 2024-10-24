@@ -12,6 +12,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/DeleteOutlined';
 import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Close';
+import hotsyncEvents, { HotsyncEvents } from "../event-emitter/hotsync-event-emitter";
 
 interface Row {
     id: number;
@@ -228,6 +229,17 @@ export function TodoPanel(props: PaperProps) {
 
     useEffect(() => {
         loadToDo();
+
+        const refreshScreen = () => {
+            loadToDo();
+        };
+
+        hotsyncEvents.on(HotsyncEvents.HotsyncUserChanged, refreshScreen);
+
+        return () => {
+            hotsyncEvents.off(HotsyncEvents.HotsyncUserChanged, refreshScreen);
+        }
+
     }, []);
 
     return (
