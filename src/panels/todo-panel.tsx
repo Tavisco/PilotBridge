@@ -1,5 +1,5 @@
 import { PaperProps } from "@mui/material/Paper";
-import { Box } from "@mui/material";
+import { Box, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, TextField, Typography } from "@mui/material";
 import { Panel } from "../panel";
 import { DataGrid, GridActionsCellItem, GridColDef, GridEventListener, GridRowEditStopReasons, GridRowId, GridRowModes, GridRowModesModel, GridRowsProp, GridSlots, GridToolbarContainer } from '@mui/x-data-grid';
 import { useEffect, useState } from "react";
@@ -12,6 +12,8 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/DeleteOutlined';
 import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Close';
+import NotesIcon from '@mui/icons-material/Notes';
+import CloseIcon from '@mui/icons-material/Close';
 import hotsyncEvents, { HotsyncEvents } from "../event-emitter/hotsync-event-emitter";
 
 interface Row {
@@ -61,6 +63,8 @@ export function TodoPanel(props: PaperProps) {
     const [db, setDb] = useState<ToDoDatabase>(new ToDoDatabase);
     const [rows, setRows] = useState<Row[]>([]);
     const [rowModesModel, setRowModesModel] = useState<GridRowModesModel>({});
+    const [notesModalOpen, setNotesModalOpen] = useState(false);
+    const [noteContent, setNoteContent] = useState<string>("");
 
     const handleRowEditStop: GridEventListener<'rowEditStop'> = (params, event) => {
         if (params.reason === GridRowEditStopReasons.rowFocusOut) {
@@ -92,13 +96,13 @@ export function TodoPanel(props: PaperProps) {
 
         const editedRow = rows.find((row) => row.id === id);
         if (editedRow!.isNew) {
-          setRows(rows.filter((row) => row.id !== id));
+            setRows(rows.filter((row) => row.id !== id));
         }
     };
 
     const processRowUpdate = (handledRow: Row) => {
-        var dbRecord = handledRow.isNew? new ToDoRecord : db.records.filter((record) => record.entry.uniqueId == handledRow.id)[0]
-        
+        var dbRecord = handledRow.isNew ? new ToDoRecord : db.records.filter((record) => record.entry.uniqueId == handledRow.id)[0]
+
         dbRecord.description = handledRow.description;
         dbRecord.note = handledRow.description;
         dbRecord.priority = handledRow.priority;
@@ -111,7 +115,7 @@ export function TodoPanel(props: PaperProps) {
             db.records.push(dbRecord);
             var appInfo = db.appInfo as ToDoAppInfo;
         }
-        
+
         console.log(db);
 
         const selectedDeviceName = prefsStore.get("selectedDevice") as string;
@@ -146,7 +150,7 @@ export function TodoPanel(props: PaperProps) {
             field: 'description',
             headerName: 'Description',
             flex: 1,
-            minWidth: 300,
+            minWidth: 290,
             editable: true,
         },
         {
@@ -160,7 +164,7 @@ export function TodoPanel(props: PaperProps) {
             field: 'actions',
             type: 'actions',
             headerName: 'Actions',
-            width: 100,
+            width: 110,
             cellClassName: 'actions',
             getActions: ({ id }) => {
                 const isInEditMode = rowModesModel[id]?.mode === GridRowModes.Edit;
@@ -186,6 +190,13 @@ export function TodoPanel(props: PaperProps) {
                 }
 
                 return [
+                    <GridActionsCellItem
+                        icon={<NotesIcon />}
+                        label="Notes"
+                        className="textPrimary"
+                        onClick={handleClickNotesOpen(id)}
+                        color="inherit"
+                    />,
                     <GridActionsCellItem
                         icon={<EditIcon />}
                         label="Edit"
@@ -242,6 +253,16 @@ export function TodoPanel(props: PaperProps) {
 
     }, []);
 
+
+    const handleClickNotesOpen = (id: GridRowId) => () => {
+        setNoteContent( db.records.filter((record) => record.entry.uniqueId == id)[0].note);
+        setNotesModalOpen(true);
+    };
+
+    const handleNotesClose = () => {
+        setNotesModalOpen(false);
+    };
+
     return (
         <Panel
             title="To Do List"
@@ -288,6 +309,47 @@ export function TodoPanel(props: PaperProps) {
                     />
                 </div>
             </Box>
+            <Dialog
+                onClose={handleNotesClose}
+                aria-labelledby="customized-dialog-title"
+                open={notesModalOpen}
+                fullWidth={true}
+                maxWidth={"md"}
+            >
+                <DialogTitle sx={{ m: 0, p: 2 }} id="customized-dialog-title">
+                    Note
+                </DialogTitle>
+                <IconButton
+                    aria-label="close"
+                    onClick={handleNotesClose}
+                    sx={(theme) => ({
+                        position: 'absolute',
+                        right: 8,
+                        top: 8,
+                        color: theme.palette.grey[500],
+                    })}
+                >
+                    <CloseIcon />
+                </IconButton>
+                <DialogContent 
+                dividers
+                >
+                    <TextField
+                        autoFocus
+                        id="note-content"
+                        label="Note content"
+                        multiline
+                        fullWidth
+                        rows={14}
+                        value={noteContent}
+                    />
+                </DialogContent>
+                <DialogActions>
+                    <Button autoFocus onClick={handleNotesClose}>
+                        Save changes
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Panel>
     );
 }
