@@ -64,7 +64,8 @@ export function TodoPanel(props: PaperProps) {
     const [rows, setRows] = useState<Row[]>([]);
     const [rowModesModel, setRowModesModel] = useState<GridRowModesModel>({});
     const [notesModalOpen, setNotesModalOpen] = useState(false);
-    const [noteContent, setNoteContent] = useState<string>("");
+    const [noteId, setNoteId] = useState<number>();
+    const [noteContent, setNoteContent] = useState<string>();
 
     const handleRowEditStop: GridEventListener<'rowEditStop'> = (params, event) => {
         if (params.reason === GridRowEditStopReasons.rowFocusOut) {
@@ -104,7 +105,6 @@ export function TodoPanel(props: PaperProps) {
         var dbRecord = handledRow.isNew ? new ToDoRecord : db.records.filter((record) => record.entry.uniqueId == handledRow.id)[0]
 
         dbRecord.description = handledRow.description;
-        dbRecord.note = handledRow.description;
         dbRecord.priority = handledRow.priority;
         dbRecord.isCompleted = handledRow.completed;
         dbRecord.dueDate = DatabaseDate.of(handledRow.dueDate);
@@ -113,11 +113,8 @@ export function TodoPanel(props: PaperProps) {
 
         if (handledRow.isNew) {
             db.records.push(dbRecord);
-            var appInfo = db.appInfo as ToDoAppInfo;
         }
-
-        console.log(db);
-
+        
         const selectedDeviceName = prefsStore.get("selectedDevice") as string;
         dbStg.writeDatabase(selectedDeviceName, RawPdbDatabase.from(db.serialize()));
 
@@ -255,11 +252,30 @@ export function TodoPanel(props: PaperProps) {
 
 
     const handleClickNotesOpen = (id: GridRowId) => () => {
-        setNoteContent( db.records.filter((record) => record.entry.uniqueId == id)[0].note);
+        if (id == null) {
+            return;
+        }
+
+        setNoteId(id as number);
+        setNoteContent(db.records.filter((record) => record.entry.uniqueId == id)[0].note);
         setNotesModalOpen(true);
     };
 
     const handleNotesClose = () => {
+        var dbRecord = db.records.filter((record) => record.entry.uniqueId == noteId)[0];
+
+        if (dbRecord == null) {
+            console.error("Failed to find dbRecord to put note in!");
+            return;
+        }
+
+        dbRecord.note = noteContent as string;
+        dbRecord.entry.attributes.dirty = true;
+
+        const selectedDeviceName = prefsStore.get("selectedDevice") as string;
+        dbStg.writeDatabase(selectedDeviceName, RawPdbDatabase.from(db.serialize()));
+
+        setNoteContent("");
         setNotesModalOpen(false);
     };
 
@@ -331,8 +347,8 @@ export function TodoPanel(props: PaperProps) {
                 >
                     <CloseIcon />
                 </IconButton>
-                <DialogContent 
-                dividers
+                <DialogContent
+                    dividers
                 >
                     <TextField
                         autoFocus
@@ -342,6 +358,9 @@ export function TodoPanel(props: PaperProps) {
                         fullWidth
                         rows={14}
                         value={noteContent}
+                        onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                          setNoteContent(event.target.value);
+                        }}
                     />
                 </DialogContent>
                 <DialogActions>
