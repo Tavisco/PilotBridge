@@ -303,7 +303,7 @@ export function App() {
             <Typography variant="h6" noWrap component="div">
               PilotBridge
               <Typography variant="caption" px={1}>
-                V 1.2.0
+                V 1.3.0
               </Typography>
             </Typography>
           </Box>
