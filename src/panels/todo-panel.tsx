@@ -244,7 +244,10 @@ export function TodoPanel(props: PaperProps) {
 
         hotsyncEvents.on(HotsyncEvents.HotsyncUserChanged, refreshScreen);
         hotsyncEvents.on(HotsyncEvents.HotsyncStarted, () => setHotsyncInProgress(true));
-        hotsyncEvents.on(HotsyncEvents.HotsyncFinished, () => setHotsyncInProgress(false));
+        hotsyncEvents.on(HotsyncEvents.HotsyncFinished, () => {
+            setHotsyncInProgress(false);
+            loadToDo();
+        });
 
         return () => {
             hotsyncEvents.off(HotsyncEvents.HotsyncUserChanged, refreshScreen);
@@ -328,6 +331,13 @@ export function TodoPanel(props: PaperProps) {
                             toolbar: { setRows, setRowModesModel },
                         }}
                     />
+                    <br/>
+                    <Typography variant="body1">
+                        Known issues:
+                        <ul>
+                            <li>Deleting notes is currently not supported. They will re-appear in the next sync.</li>
+                        </ul>
+                    </Typography>
                 </div>
             )}
 
