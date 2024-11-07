@@ -66,6 +66,7 @@ export function TodoPanel(props: PaperProps) {
     const [notesModalOpen, setNotesModalOpen] = useState(false);
     const [noteId, setNoteId] = useState<number>();
     const [noteContent, setNoteContent] = useState<string>();
+    const [hotsyncInProgress, setHotsyncInProgress] = useState(false);
 
     const handleRowEditStop: GridEventListener<'rowEditStop'> = (params, event) => {
         if (params.reason === GridRowEditStopReasons.rowFocusOut) {
@@ -212,7 +213,6 @@ export function TodoPanel(props: PaperProps) {
         }
     ];
 
-
     async function loadToDo() {
         const selectedDeviceName = prefsStore.get("selectedDevice") as string;
         const tempDb = ToDoDatabase.from(await dbStg.getDatabaseBuffer(selectedDeviceName, 'ToDoDB.pdb'));
@@ -243,10 +243,14 @@ export function TodoPanel(props: PaperProps) {
         };
 
         hotsyncEvents.on(HotsyncEvents.HotsyncUserChanged, refreshScreen);
+        hotsyncEvents.on(HotsyncEvents.HotsyncStarted, () => setHotsyncInProgress(true));
+        hotsyncEvents.on(HotsyncEvents.HotsyncFinished, () => setHotsyncInProgress(false));
 
         return () => {
             hotsyncEvents.off(HotsyncEvents.HotsyncUserChanged, refreshScreen);
-        }
+            hotsyncEvents.off(HotsyncEvents.HotsyncStarted, setHotsyncInProgress);
+            hotsyncEvents.off(HotsyncEvents.HotsyncFinished, setHotsyncInProgress);
+        };
 
     }, []);
 
@@ -287,6 +291,7 @@ export function TodoPanel(props: PaperProps) {
             sx={{ width: "100%" }}
         >
             <Box>
+            {!hotsyncInProgress && (
                 <div
                     style={{
                         minHeight: "35vh",
@@ -324,6 +329,25 @@ export function TodoPanel(props: PaperProps) {
                         }}
                     />
                 </div>
+            )}
+
+            {hotsyncInProgress && (
+                <div
+                style={{
+                    display: "grid",
+                    placeContent: "center",
+                    textAlign: "center",
+                    padding: "2em",
+                }}
+                >
+                <Typography variant="h5" gutterBottom>
+                    🔁 HotSync in progress...
+                </Typography>
+                <Typography variant="body1">
+                    Please wait for the current HotSync session to finish.
+                </Typography>
+                </div>
+            )}
             </Box>
             <Dialog
                 onClose={handleNotesClose}
