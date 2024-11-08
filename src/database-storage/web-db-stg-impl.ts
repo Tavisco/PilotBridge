@@ -28,12 +28,12 @@ export class WebDatabaseStorageImplementation
     return truncatedHash;
   }
 
-  async createUsernameInStorage(requestedUserName: string): Promise<void> {
+  async createUser(requestedUserName: string): Promise<void> {
     await this.getBackupDirectory(requestedUserName, true);
     await this.getInstallDirectory(requestedUserName, true);
   }
 
-  async isUsernameKnownInStorage(requestedUserName: string): Promise<boolean> {
+  async userExists(requestedUserName: string): Promise<boolean> {
     try {
       await this.getBackupDirectory(requestedUserName);
       return true;
@@ -42,11 +42,11 @@ export class WebDatabaseStorageImplementation
     }
   }
 
-  async writeDatabaseToStorage(
+  async writeDatabase(
     requestedUserName: string,
     db: RawPdbDatabase | RawPrcDatabase
   ): Promise<void> {
-    console.log("Writting DB");
+    console.log(`Writing DB for [${requestedUserName}]`);
     const backupDir = await this.getBackupDirectory(requestedUserName);
     const fileHandle = await backupDir.getFileHandle(this.getDbFullName(db), {
       create: true,
@@ -56,11 +56,11 @@ export class WebDatabaseStorageImplementation
     await writable.close();
   }
 
-  async readDatabaseFromStorage(
+  async getDatabaseBuffer(
     requestedUserName: string,
     dbName: string
-  ): Promise<RawPdbDatabase | RawPrcDatabase> {
-    console.log("Reading DB");
+  ): Promise<Buffer> {
+    console.log(`Reading DB [${requestedUserName}]\\[${dbName}]`);
     const backupDir = await this.getBackupDirectory(requestedUserName);
     let fileHandle;
 
@@ -78,14 +78,21 @@ export class WebDatabaseStorageImplementation
     }
 
     const file = await fileHandle.getFile();
-    const fileBuffer = Buffer.from(await file.arrayBuffer());
+    return Buffer.from(await file.arrayBuffer());
+  }
+
+  async readDatabase(
+    requestedUserName: string,
+    dbName: string
+  ): Promise<RawPdbDatabase | RawPrcDatabase> {
+    const fileBuffer = await this.getDatabaseBuffer(requestedUserName, dbName);
     const header = DatabaseHdrType.from(fileBuffer);
     return header.attributes.resDB
       ? RawPrcDatabase.from(fileBuffer)
       : RawPdbDatabase.from(fileBuffer);
   }
 
-  async databaseExistsInStorage(
+  async databaseExists(
     requestedUserName: string,
     dbName: string
   ): Promise<boolean> {
@@ -102,7 +109,7 @@ export class WebDatabaseStorageImplementation
     }
   }
 
-  async getAllDatabasesFromStorage(
+  async getAllDatabases(
     requestedUserName: string
   ): Promise<Array<RawPdbDatabase | RawPrcDatabase>> {
     console.log(`Get all DB for [${requestedUserName}]`);
@@ -111,7 +118,7 @@ export class WebDatabaseStorageImplementation
 
     for await (const entry of (backupDir as any).values()) {
       if (entry.kind === "file") {
-        const db = await this.readDatabaseFromStorage(
+        const db = await this.readDatabase(
           requestedUserName,
           entry.name
         );
@@ -136,7 +143,7 @@ export class WebDatabaseStorageImplementation
         entry.kind === "file" &&
         (entry.name.endsWith(".prc") || entry.name.endsWith(".pdb"))
       ) {
-        const db = await this.readDatabaseFromStorage(
+        const db = await this.readDatabase(
           requestedUserName,
           entry.name
         );

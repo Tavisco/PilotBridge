@@ -92,11 +92,10 @@ export const DoHotsyncBar = observer(function DoHotsyncBar() {
       });
     } catch (error) {
       console.error(error);
+    } finally {
+      setDoingHotsync(false);
+      hotsyncEvents.emit(HotsyncEvents.HotsyncFinished);
     }
-
-    setDoingHotsync(false);
-    hotsyncEvents.emit(HotsyncEvents.HotsyncFinished);
-    return;
   };
 
   const handleChange = (event: SelectChangeEvent) => {

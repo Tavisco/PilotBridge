@@ -27,6 +27,7 @@ import { InstallAppPanel } from "./panels/install-app-panel";
 import { DeviceInfoPanel } from "./device-info-panel";
 import { DoHotsyncBar } from "./do-hotsync-bar";
 import SettingsIcon from '@mui/icons-material/Settings';
+import ChecklistIcon from '@mui/icons-material/Checklist';
 import MenuIcon from "@mui/icons-material/Menu";
 import InfoIcon from "@mui/icons-material/Info";
 import InstallMobileIcon from "@mui/icons-material/InstallMobile";
@@ -35,6 +36,7 @@ import { LogViewer } from "./log-viewer";
 import { AboutPanel } from "./panels/about-panel";
 import { HomePanel } from "./panels/home-panel";
 import { SettingsPanel } from "./panels/settings-panel";
+import { TodoPanel } from "./panels/todo-panel";
 
 function UnsupportedApisBanner() {
   return (
@@ -115,7 +117,7 @@ const ConnectionSelector = observer(function ConnectionSelector() {
 
 export function App() {
   const [mobileOpen, setMobileOpen] = React.useState(false);
-  const [currentComponent, setCurrentComponent] = React.useState("help");
+  const [currentComponent, setCurrentComponent] = React.useState("home");
   const drawerWidth = 240;
 
   const handleDrawerToggle = () => {
@@ -169,7 +171,7 @@ export function App() {
               </ListItemIcon>
               <ListItemText primary="Address" />
             </ListItemButton>
-          </ListItem>
+          </ListItem>*/}
           <ListItem key="todo" disablePadding>
             <ListItemButton
               selected={currentComponent === "todo"}
@@ -181,7 +183,7 @@ export function App() {
               <ListItemText primary="To Do" />
             </ListItemButton>
           </ListItem>
-          <ListItem key="memo" disablePadding>
+          {/* <ListItem key="memo" disablePadding>
             <ListItemButton
               selected={currentComponent === "memo"}
               onClick={() => handleListItemClick("memo")}
@@ -191,7 +193,7 @@ export function App() {
               </ListItemIcon>
               <ListItemText primary="Memo" />
             </ListItemButton>
-          </ListItem> */}
+          </ListItem>  */}
           <ListItem key="install-app" disablePadding>
             <ListItemButton
               selected={currentComponent === "install"}
@@ -261,7 +263,7 @@ export function App() {
       case "address":
         return <div>WIP Adress</div>;
       case "todo":
-        return <div>WIP ToDo</div>;
+        return <TodoPanel />;
       case "memo":
         return <div>WIP Memo</div>;
       case "install":
@@ -301,7 +303,7 @@ export function App() {
             <Typography variant="h6" noWrap component="div">
               PilotBridge
               <Typography variant="caption" px={1}>
-                V 1.2.0
+                V 1.3.0
               </Typography>
             </Typography>
           </Box>
@@ -356,9 +358,8 @@ export function App() {
         <Grid container spacing={2}>
           <Grid item={true} xs={12} md={8}>
             <Container
-              maxWidth="md" // Adjust maxWidth according to your needs (e.g., xs, sm, md, lg, xl)
               sx={{
-                paddingX: { xs: 2, sm: 4, md: 8 }, // Adjust padding for different screen sizes
+                paddingX: { xs: 2, sm: 4, md: 1 }, // Adjust padding for different screen sizes
                 display: "flex",
                 justifyContent: "center",
                 alignItems: "center",

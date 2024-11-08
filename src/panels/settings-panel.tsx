@@ -21,33 +21,35 @@ export function SettingsPanel(props: PaperProps) {
   };
 
   return (
-    <Panel
-      title="Settings"
-      isExpandedByDefault={true}
-      {...props}
-      sx={{ width: "100%" }}
-    >
-      <Box>
-        <div
-          style={{
-            padding: "2em",
-            paddingTop: "0em"
-          }}
-        >
-          <TabContext value={value}>
-            <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-              <TabList onChange={handleChange} aria-label="Settings tabs" centered>
-                <Tab icon={<PeopleIcon />} iconPosition="start" label="Users" value="users" />
-                <Tab icon={<SaveIcon />} iconPosition="start" label="Data" value="data" />
-                <Tab icon={<ScienceIcon />} iconPosition="start" label="Testing" value="testing" />
-              </TabList>
-            </Box>
-            <TabPanel value="users"><ManagerUsersPanel /></TabPanel>
-            <TabPanel value="data"><DataMgmtPanel /></TabPanel>
-            <TabPanel value="testing"><TestPanel /></TabPanel>
-          </TabContext>
-        </div>
-      </Box>
-    </Panel>
+    <Box minWidth="60vh">
+      <Panel
+        title="Settings"
+        isExpandedByDefault={true}
+        {...props}
+        // sx={{ width: "100%" }}
+      >
+        <Box>
+          <div
+            style={{
+              padding: "2em",
+              paddingTop: "0em"
+            }}
+          >
+            <TabContext value={value}>
+              <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+                <TabList onChange={handleChange} aria-label="Settings tabs" centered>
+                  <Tab icon={<PeopleIcon />} iconPosition="start" label="Users" value="users" />
+                  <Tab icon={<SaveIcon />} iconPosition="start" label="Data" value="data" />
+                  <Tab icon={<ScienceIcon />} iconPosition="start" label="Testing" value="testing" />
+                </TabList>
+              </Box>
+              <TabPanel value="users"><ManagerUsersPanel /></TabPanel>
+              <TabPanel value="data"><DataMgmtPanel /></TabPanel>
+              <TabPanel value="testing"><TestPanel /></TabPanel>
+            </TabContext>
+          </div>
+        </Box>
+      </Panel>
+    </Box>
   );
 }

@@ -198,8 +198,6 @@ export function InstallAppPanel(props: PaperProps) {
   const [appNames, setAppNames] = useState<string[]>([]);
   const [bitmaps, setBitmaps] = useState<TAIBBitmap[]>([]);
 
-  // const [databases, setDatabases] = useState<{[filename: string]: RawPdbDatabase | RawPrcDatabase}>({});
-
   async function renderFiles() {
     const deviceName = prefsStore.get("selectedDevice") as string;
 
@@ -252,18 +250,18 @@ export function InstallAppPanel(props: PaperProps) {
   useEffect(() => {
     renderFiles();
 
-    const handleHotsyncFinished = () => {
+    const refreshScreen = () => {
       renderFiles();
     };
 
-    hotsyncEvents.on(HotsyncEvents.HotsyncFinished, handleHotsyncFinished);
-    hotsyncEvents.on(HotsyncEvents.HotsyncUserChanged, handleHotsyncFinished);
+    hotsyncEvents.on(HotsyncEvents.HotsyncFinished, refreshScreen);
+    hotsyncEvents.on(HotsyncEvents.HotsyncUserChanged, refreshScreen);
 
     return () => {
-      hotsyncEvents.off(HotsyncEvents.HotsyncFinished, handleHotsyncFinished);
+      hotsyncEvents.off(HotsyncEvents.HotsyncFinished, refreshScreen);
       hotsyncEvents.off(
         HotsyncEvents.HotsyncUserChanged,
-        handleHotsyncFinished
+        refreshScreen
       );
     };
   }, []);
