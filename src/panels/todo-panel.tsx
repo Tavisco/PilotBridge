@@ -3,7 +3,7 @@ import { Box, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Tex
 import { Panel } from "../panel";
 import { DataGrid, GridActionsCellItem, GridColDef, GridEventListener, GridRowEditStopReasons, GridRowId, GridRowModes, GridRowModesModel, GridRowsProp, GridSlots, GridToolbarContainer } from '@mui/x-data-grid';
 import { useEffect, useState } from "react";
-import { DatabaseDate, RawPdbDatabase, ToDoAppInfo, ToDoDatabase, ToDoRecord } from "palm-pdb";
+import { DatabaseDate, RawPdbDatabase, ToDoDatabase, ToDoRecord } from "palm-pdb";
 import { WebDatabaseStorageImplementation } from "../database-storage/web-db-stg-impl";
 import { prefsStore } from "../prefs-store";
 import Button from '@mui/material/Button';
