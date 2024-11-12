@@ -32,11 +32,13 @@ import MenuIcon from "@mui/icons-material/Menu";
 import InfoIcon from "@mui/icons-material/Info";
 import InstallMobileIcon from "@mui/icons-material/InstallMobile";
 import HomeIcon from '@mui/icons-material/Home';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import { LogViewer } from "./log-viewer";
 import { AboutPanel } from "./panels/about-panel";
 import { HomePanel } from "./panels/home-panel";
 import { SettingsPanel } from "./panels/settings-panel";
 import { TodoPanel } from "./panels/todo-panel";
+import { CalendarPanel } from "./panels/calendar-panel";
 
 function UnsupportedApisBanner() {
   return (
@@ -150,7 +152,7 @@ export function App() {
               <ListItemText primary="Home" />
             </ListItemButton>
           </ListItem>
-          {/* <ListItem key="calendar" disablePadding>
+          <ListItem key="calendar" disablePadding>
             <ListItemButton
               selected={currentComponent === "calendar"}
               onClick={() => handleListItemClick("calendar")}
@@ -160,7 +162,7 @@ export function App() {
               </ListItemIcon>
               <ListItemText primary="Calendar" />
             </ListItemButton>
-          </ListItem> */}
+          </ListItem>
           {/* <ListItem key="address" disablePadding>
             <ListItemButton
               selected={currentComponent === "address"}
@@ -259,7 +261,7 @@ export function App() {
       case "home":
         return <HomePanel />;
       case "calendar":
-        return <div>WIP Calendar</div>;
+        return <CalendarPanel />;
       case "address":
         return <div>WIP Adress</div>;
       case "todo":
