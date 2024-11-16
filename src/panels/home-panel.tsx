@@ -26,7 +26,7 @@ export function HomePanel(props: PaperProps) {
             <Grid2 container spacing={2} maxWidth="md">
                 <Grid2 size={12}>
                     <Panel
-                        title="Help"
+                        title="Getting started"
                         isExpandedByDefault={true}
                         {...props}
                         sx={{ width: "100%" }}
@@ -38,21 +38,24 @@ export function HomePanel(props: PaperProps) {
                                     padding: "2em",
                                 }}
                             >
+                                <Typography variant="body1">
+                                Follow those instructions to get started:
+                                </Typography>
                                 <List sx={style}>
                                     <ListItem key="setup">
-                                        <ListItemText primary="Setup the USB drivers" secondary="(Only needed if using USB) On windows you need to install the Zadig drivers, the offical Palm Desktop/Aceeca drivers won't work. On Linux, you need to blacklist the visor modules. On MacOS, it should work out of the box. The following link has instructions on how to set up for each platform: https://github.com/jichu4n/palm-sync/blob/doc/docs/connecting-palm-os-devices.md" />
+                                        <ListItemText primary="1. Setup the USB drivers" secondary="(Only needed if using USB) On windows you need to install the Zadig drivers, the offical Palm Desktop/Aceeca drivers won't work. On Linux, you need to blacklist the visor modules. On MacOS, it should work out of the box. The following link has instructions on how to set up for each platform: https://github.com/jichu4n/palm-sync/blob/doc/docs/connecting-palm-os-devices.md" />
                                     </ListItem>
                                     <Divider component="li" />
                                     <ListItem key="start">
-                                        <ListItemText primary="How to get started" secondary="After setting up the drivers (if using USB), add a new user clicking in the 'Users' dropdown at the right top, and then select the 'Add new' option." />
+                                        <ListItemText primary="2. Setup the user" secondary="After setting up the drivers (if using USB), add a new user clicking in the 'Users' dropdown at the right top, and then select the 'Add new' option." />
                                     </ListItem>
                                     <Divider component="li" />
                                     <ListItem key="startHotsync">
-                                        <ListItemText primary="How to start a Hotsync" secondary="In the bottom left of the screen, make sure to select the correct conenction method (USB or Serial). Select the User in the dropdown and insert the PDA in the cradle, then, click the green 'Hotsync' buttom at the top right, a pop-up prompting to select a device will appear. At this moment press the hotsync button in the cradle, which will cause the PDA to appear in the list, select it and click 'Connect'. The hotsync will start." />
+                                        <ListItemText primary="3. Start a Hotsync" secondary="In the bottom left of the screen, make sure to select the correct conenction method (USB or Serial). Select the User in the dropdown and insert the PDA in the cradle, then, click the green 'Hotsync' buttom at the top right, a pop-up prompting to select a device will appear. At this moment press the hotsync button in the cradle, which will cause the PDA to appear in the list, select it and click 'Connect'. The hotsync will start." />
                                     </ListItem>
                                     <Divider component="li" />
                                     <ListItem key="cloud">
-                                        <ListItemText primary="Is my data backuped to a server/cloud?" secondary="No. All data is only stored in your browser's OPFS storage and never leaves it. Everything runs on the client-side (your browser), there is no backend server in play here." />
+                                        <ListItemText primary="Bonus! Is my data backuped to a server/cloud?" secondary="No. All data is only stored in your browser's OPFS storage and never leaves it. Everything runs on the client-side (your browser), there is no backend server (cloud) in play here." />
                                     </ListItem>
                                 </List>
                             </div>
