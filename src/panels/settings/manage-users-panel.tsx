@@ -1,9 +1,9 @@
 import { Box, IconButton, List, ListItem, ListItemText } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { useEffect, useState } from "react";
-import { WebDatabaseStorageImplementation } from "../database-storage/web-db-stg-impl";
-import { prefsStore } from "../prefs-store";
-import hotsyncEvents, { HotsyncEvents } from "../event-emitter/hotsync-event-emitter";
+import { WebDatabaseStorageImplementation } from "../../database-storage/web-db-stg-impl";
+import { prefsStore } from "../../prefs-store";
+import hotsyncEvents, { HotsyncEvents } from "../../event-emitter/hotsync-event-emitter";
 
 export function ManagerUsersPanel() {
   const [usernames, setUsernames] = useState<string[]>([]);

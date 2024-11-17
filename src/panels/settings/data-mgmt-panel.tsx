@@ -4,8 +4,8 @@ import LoadingButton from '@mui/lab/LoadingButton';
 import { Fragment, useCallback, useState } from "react";
 import { Grid2 } from "@mui/material";
 import JSZip from "jszip";
-import hotsyncEvents, { HotsyncEvents } from "../event-emitter/hotsync-event-emitter";
-import { prefsStore } from "../prefs-store";
+import hotsyncEvents, { HotsyncEvents } from "../../event-emitter/hotsync-event-emitter";
+import { prefsStore } from "../../prefs-store";
 
 async function zipFolderRecursively(folderHandle: FileSystemDirectoryHandle, zip: JSZip) {
     for await (const [name, handle] of (folderHandle as any).entries()) {

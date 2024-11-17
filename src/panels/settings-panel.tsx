@@ -9,9 +9,11 @@ import { useState } from "react";
 import PeopleIcon from '@mui/icons-material/People';
 import SaveIcon from '@mui/icons-material/Save';
 import ScienceIcon from "@mui/icons-material/Science";
-import { ManagerUsersPanel } from "./manage-users-panel";
-import { TestPanel } from "./test-panel";
-import { DataMgmtPanel } from "./data-mgmt-panel";
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import { ManagerUsersPanel } from "./settings/manage-users-panel";
+import { TestPanel } from "./settings/test-panel";
+import { DataMgmtPanel } from "./settings/data-mgmt-panel";
+import { CalendarSettingsPanel } from "./settings/calendar-settings-panel";
 
 export function SettingsPanel(props: PaperProps) {
   const [value, setValue] = useState('users');
@@ -41,11 +43,13 @@ export function SettingsPanel(props: PaperProps) {
                   <Tab icon={<PeopleIcon />} iconPosition="start" label="Users" value="users" />
                   <Tab icon={<SaveIcon />} iconPosition="start" label="Data" value="data" />
                   <Tab icon={<ScienceIcon />} iconPosition="start" label="Testing" value="testing" />
+                  <Tab icon={<CalendarMonthIcon />} iconPosition="start" label="Calendar" value="calendar" />
                 </TabList>
               </Box>
               <TabPanel value="users"><ManagerUsersPanel /></TabPanel>
               <TabPanel value="data"><DataMgmtPanel /></TabPanel>
               <TabPanel value="testing"><TestPanel /></TabPanel>
+              <TabPanel value="calendar"><CalendarSettingsPanel /></TabPanel>
             </TabContext>
           </div>
         </Box>
