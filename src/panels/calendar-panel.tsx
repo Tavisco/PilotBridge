@@ -1,5 +1,5 @@
 import { PaperProps } from "@mui/material/Paper";
-import { Box, Typography } from "@mui/material";
+import { Alert, AlertTitle, Box, Typography } from "@mui/material";
 import { Panel } from "../panel";
 import { useEffect, useState } from "react";
 import hotsyncEvents, { HotsyncEvents } from "../event-emitter/hotsync-event-emitter";
@@ -41,7 +41,10 @@ export function CalendarPanel(props: PaperProps) {
                         width: "100%"
                     }}
                 >
-                    <p>Bacana!</p>
+                    <Alert severity="info">
+                    <AlertTitle>Info</AlertTitle>
+                    Add a iCalendar in the settings to sync it.
+                    </Alert>
                 </div>
             )}
 

@@ -3,6 +3,7 @@ import {action, makeObservable, observable} from 'mobx';
 export interface Prefs {
   connectionString: 'usb' | 'serial:web';
   selectedDevice: string;
+  iCalendarURL: string;
 }
 
 function getDefaultConnectionString() {
@@ -20,6 +21,7 @@ function getDefaultConnectionString() {
 export const DEFAULT_PREFS: Prefs = Object.freeze({
   connectionString: getDefaultConnectionString(),
   selectedDevice: '',
+  iCalendarURL: '',
 });
 
 class PrefsStore {
