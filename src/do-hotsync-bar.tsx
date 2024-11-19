@@ -31,6 +31,7 @@ import hotsyncEvents, {
 } from "./event-emitter/hotsync-event-emitter";
 import { useEffect, useState } from "react";
 import { prefsStore } from "./prefs-store";
+import { ICalendarConduit } from "./conduits/iCalendar-conduit";
 
 const dbStg = new WebDatabaseStorageImplementation();
 const addNewDevicePlaceholder = "add_new_device";
@@ -82,11 +83,12 @@ export const DoHotsyncBar = observer(function DoHotsyncBar() {
     try {
       await runSync(async (dlpConnection: DlpConnection) => {
         let conduits = [
-          new SyncDatabasesConduit(),
-          new DownloadNewResourcesConduit(),
-          new InstallNewResourcesConduit(),
-          new UpdateClockConduit(),
-          new UpdateSyncInfoConduit(),
+          new ICalendarConduit(),
+          // new SyncDatabasesConduit(),
+          // new DownloadNewResourcesConduit(),
+          // new InstallNewResourcesConduit(),
+          // new UpdateClockConduit(),
+          // new UpdateSyncInfoConduit(),
         ];
         return await syncDevice(dlpConnection, deviceName, dbStg, conduits);
       });
