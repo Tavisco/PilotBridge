@@ -5,6 +5,8 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 import React, {useMemo} from 'react';
 import ReactDOM from 'react-dom/client';
 import {App} from './app';
+import { GoogleOAuthProvider } from '@react-oauth/google';
+import { prefsStore } from './prefs-store';
 
 export function AppWrapper() {
   const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)');
@@ -20,11 +22,15 @@ export function AppWrapper() {
       }),
     [prefersDarkMode]
   );
+  const clientId = prefsStore.get('googleClientID');
+  
   return (
     <>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <App />
+        <GoogleOAuthProvider clientId={clientId}>
+          <App />
+        </GoogleOAuthProvider>
       </ThemeProvider>
     </>
   );
