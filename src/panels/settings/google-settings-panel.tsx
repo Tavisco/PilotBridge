@@ -1,4 +1,4 @@
-import { Box, Button, Grid2, TextField, Typography } from "@mui/material";
+import { Box, Button, FormControlLabel, FormGroup, Grid2, Switch, TextField, Typography } from "@mui/material";
 import SaveIcon from '@mui/icons-material/Save';
 import { prefsStore } from '../../prefs-store';
 import { useEffect, useState } from "react";
@@ -8,17 +8,25 @@ export function GoogleSettingsPanel() {
   const [currentClientID, setCurrentClientId] = useState('');
   const [currentSecretKey, setCurrentSecretKey] = useState('');
   const [saveButtonColor, setSaveButtonColor] = useState('primary');
+  const [integrationEnabled, setIntegrationEnabled] = useState(false);
 
   useEffect(() => {
-    setCurrentClientId(prefsStore.get('googleClientID'));
-    setCurrentSecretKey(prefsStore.get('googleSecretKey'));
+    setCurrentClientId(prefsStore.get('googleClientID') as string);
+    setCurrentSecretKey(prefsStore.get('googleSecretKey') as string);
+    setIntegrationEnabled(prefsStore.isConduitEnabled('googleCalendar'));
   }, []);
 
   const handleSaveClick = () => {
     prefsStore.set('googleClientID', currentClientID);
     prefsStore.set('googleSecretKey', currentSecretKey);
+    if (integrationEnabled) {
+      prefsStore.enableConduit('googleCalendar');
+    } else {
+      prefsStore.disableConduit('googleCalendar');
+    }
+
     setSaveButtonColor('success');
-  }
+  };
 
   return (
     <Box
@@ -28,6 +36,14 @@ export function GoogleSettingsPanel() {
       autoComplete="off"
     >
       <Grid2 container spacing={2} maxWidth="md">
+
+        <Grid2 size={12} sx={{ '& > :not(style)': { m: 1 } }}>
+          <FormGroup>
+            <FormControlLabel control={<Switch checked={integrationEnabled} onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+              setIntegrationEnabled(event.target.checked);
+            }}  />} label="Enable google integration" />
+          </FormGroup>
+        </Grid2>
 
         <Grid2 size={12} sx={{ '& > :not(style)': { m: 1 } }}>
           <Typography variant="body1">

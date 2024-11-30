@@ -14,7 +14,8 @@ export function HomePanel(props: PaperProps) {
     };
 
     const changelogData = [
-        { version: '1.3.0', date: '2021-11-07', changes: ['Add To Do'] },
+        { version: '1.4.0', date: 'XXX', changes: ['Add Calendar, which can retrieve events from Google Calendar']},
+        { version: '1.3.0', date: '2024-11-07', changes: ['Add To Do'] },
         { version: '1.2.0', date: '2024-09-08', changes: ['Add data export and import in the settings', 'Remove unimplemented functionality from the menu bar', 'New URL! https://pilotbridge.tavisco.dev/'] },
         { version: '1.1.0', date: '2024-08-22', changes: ['Improve the performance of the first sync'] },
         { version: '1.0.0', date: '2024-08-10', changes: ['Initial release'] },

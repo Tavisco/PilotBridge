@@ -22,7 +22,7 @@ export function AppWrapper() {
       }),
     [prefersDarkMode]
   );
-  const clientId = prefsStore.get('googleClientID');
+  const clientId = prefsStore.get('googleClientID') as string;
   
   return (
     <>

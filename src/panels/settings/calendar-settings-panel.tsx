@@ -9,7 +9,7 @@ export function CalendarSettingsPanel() {
   const [saveButtonColor, setSaveButtonColor] = useState('primary');
 
   useEffect(() => {
-    setCurrentICalendarURL(prefsStore.get('iCalendarURL'));
+    setCurrentICalendarURL(prefsStore.get('iCalendarURL') as string);
   }, []);
 
   const handleSaveClick = () => {

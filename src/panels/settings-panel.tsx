@@ -15,6 +15,7 @@ import { TestPanel } from "./settings/test-panel";
 import { DataMgmtPanel } from "./settings/data-mgmt-panel";
 import { CalendarSettingsPanel } from "./settings/calendar-settings-panel";
 import { GoogleSettingsPanel } from "./settings/google-settings-panel";
+import GoogleIcon from '@mui/icons-material/Google';
 
 export function SettingsPanel(props: PaperProps) {
   const [value, setValue] = useState('users');
@@ -45,7 +46,7 @@ export function SettingsPanel(props: PaperProps) {
                   <Tab icon={<SaveIcon />} iconPosition="start" label="Data" value="data" />
                   <Tab icon={<ScienceIcon />} iconPosition="start" label="Testing" value="testing" />
                   <Tab icon={<CalendarMonthIcon />} iconPosition="start" label="Calendar" value="calendar" />
-                  <Tab icon={<CalendarMonthIcon />} iconPosition="start" label="Google Integration" value="google" />
+                  <Tab icon={<GoogleIcon />} iconPosition="start" label="Google Integration" value="google" />
                 </TabList>
               </Box>
               <TabPanel value="users"><ManagerUsersPanel /></TabPanel>

@@ -12,7 +12,7 @@ export class ICalendarConduit implements ConduitInterface {
 
         try {
             // Replace with the URL of your iCalendar file
-            const icsUrl = prefsStore.get('iCalendarURL');
+            const icsUrl = prefsStore.get('iCalendarURL') as string;
             
             // Fetch the iCalendar file
             const response = await fetch(icsUrl);

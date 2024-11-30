@@ -6,6 +6,7 @@ export interface Prefs {
   iCalendarURL: string;
   googleClientID: string;
   googleSecretKey: string;
+  enabledOptConduits: string[];
 }
 
 function getDefaultConnectionString() {
@@ -26,6 +27,7 @@ export const DEFAULT_PREFS: Prefs = Object.freeze({
   iCalendarURL: '',
   googleClientID: '',
   googleSecretKey: '',
+  enabledOptConduits: [] as string[],
 });
 
 class PrefsStore {
@@ -59,6 +61,30 @@ class PrefsStore {
   set(key: keyof Prefs, value: Prefs[keyof Prefs]) {
     this.update({[key]: value});
   }
+
+  enableConduit(conduitName: string) {
+    var currentConduits = this.get('enabledOptConduits') as string[];
+    if (currentConduits.indexOf(conduitName) == -1) {
+      currentConduits.push(conduitName);
+    }
+    this.set('enabledOptConduits', currentConduits);
+  }
+
+  disableConduit(conduitName: string) {
+    var currentConduits = this.get('enabledOptConduits') as string[];
+    const conduitIndex = currentConduits.indexOf(conduitName);
+    if (conduitIndex != -1) {
+      currentConduits.splice(conduitIndex, 1);
+    }
+    
+    this.set('enabledOptConduits', currentConduits);
+  }
+
+  isConduitEnabled(conduitName: string): boolean {
+    var currentConduits = this.get('enabledOptConduits') as string[];
+    return currentConduits.indexOf(conduitName) != -1;
+  }
+
 }
 
 export const prefsStore = new PrefsStore();

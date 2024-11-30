@@ -65,7 +65,7 @@ function UnsupportedApisBanner() {
 }
 
 const ConnectionSelector = observer(function ConnectionSelector() {
-  const connectionString = prefsStore.get("connectionString");
+  const connectionString = prefsStore.get("connectionString") as string;
   const onChange = useCallback((_: unknown, newConnectionString: string) => {
     if (newConnectionString === "usb" || newConnectionString === "serial:web") {
       prefsStore.set("connectionString", newConnectionString);
@@ -307,7 +307,7 @@ export function App() {
             <Typography variant="h6" noWrap component="div">
               PilotBridge
               <Typography variant="caption" px={1}>
-                V 1.3.0
+                V 1.4.0
               </Typography>
             </Typography>
           </Box>
