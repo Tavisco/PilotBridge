@@ -39,6 +39,8 @@ import { HomePanel } from "./panels/home-panel";
 import { SettingsPanel } from "./panels/settings-panel";
 import { TodoPanel } from "./panels/todo-panel";
 import { CalendarPanel } from "./panels/calendar-panel";
+import 'react-big-calendar/lib/css/react-big-calendar.css';
+
 
 function UnsupportedApisBanner() {
   return (
