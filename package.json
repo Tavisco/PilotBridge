@@ -34,6 +34,8 @@
   },
   "devDependencies": {
     "@types/dom-serial": "^1.0.6",
+    "@types/gapi": "^0.0.47",
+    "@types/gsi": "^0.0.4",
     "@types/node": "^22.7.3",
     "@types/react": "^18.3.3",
     "@types/react-big-calendar": "^1.16.0",

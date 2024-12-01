@@ -32,6 +32,7 @@ import hotsyncEvents, {
 import { useEffect, useState } from "react";
 import { prefsStore } from "./prefs-store";
 import { ICalendarConduit } from "./conduits/iCalendar-conduit";
+import { GoogleCalendarConduit } from "./conduits/google-calendar-conduit";
 
 const dbStg = new WebDatabaseStorageImplementation();
 const addNewDevicePlaceholder = "add_new_device";
@@ -83,7 +84,8 @@ export const DoHotsyncBar = observer(function DoHotsyncBar() {
     try {
       await runSync(async (dlpConnection: DlpConnection) => {
         let conduits = [
-          new ICalendarConduit(),
+          new GoogleCalendarConduit(),
+          //new ICalendarConduit(),
           // new SyncDatabasesConduit(),
           // new DownloadNewResourcesConduit(),
           // new InstallNewResourcesConduit(),

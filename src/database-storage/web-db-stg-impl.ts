@@ -46,9 +46,10 @@ export class WebDatabaseStorageImplementation
     requestedUserName: string,
     db: RawPdbDatabase | RawPrcDatabase
   ): Promise<void> {
-    console.log(`Writing DB for [${requestedUserName}]`);
+    const dbName = this.getDbFullName(db);
+    console.log(`Writing DB [${dbName}] for [${requestedUserName}]`);
     const backupDir = await this.getBackupDirectory(requestedUserName);
-    const fileHandle = await backupDir.getFileHandle(this.getDbFullName(db), {
+    const fileHandle = await backupDir.getFileHandle(dbName, {
       create: true,
     });
     const writable = await fileHandle.createWritable();
