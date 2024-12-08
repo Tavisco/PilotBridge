@@ -18,12 +18,7 @@ import SyncIcon from "@mui/icons-material/Sync";
 import { runSync } from "./run-sync";
 import {
   DlpConnection,
-  DownloadNewResourcesConduit,
-  InstallNewResourcesConduit,
-  SyncDatabasesConduit,
   syncDevice,
-  UpdateClockConduit,
-  UpdateSyncInfoConduit,
 } from "palm-sync";
 import { WebDatabaseStorageImplementation } from "./database-storage/web-db-stg-impl";
 import hotsyncEvents, {
@@ -31,8 +26,8 @@ import hotsyncEvents, {
 } from "./event-emitter/hotsync-event-emitter";
 import { useEffect, useState } from "react";
 import { prefsStore } from "./prefs-store";
-import { ICalendarConduit } from "./conduits/iCalendar-conduit";
 import { GoogleCalendarConduit } from "./conduits/google-calendar-conduit";
+import { GoogleLogin, useGoogleLogin } from "@react-oauth/google";
 
 const dbStg = new WebDatabaseStorageImplementation();
 const addNewDevicePlaceholder = "add_new_device";
@@ -69,9 +64,9 @@ export const DoHotsyncBar = observer(function DoHotsyncBar() {
 
   async function updateSelectedDevice(deviceName: string) {
     setKnownDevices(await dbStg.getAllDevicesNames());
-    
+
     prefsStore.set("selectedDevice", deviceName);
-    
+
     hotsyncEvents.emit(HotsyncEvents.HotsyncUserChanged);
   }
 
@@ -112,10 +107,22 @@ export const DoHotsyncBar = observer(function DoHotsyncBar() {
     }
   };
 
+  const loginWithGoogleAndSync = useGoogleLogin({
+    onSuccess: tokenResponse => {
+      console.log(tokenResponse);
+      handleDoSyncClick();
+    }
+  });
+
+  function shouldDisplayGoogleLogin(): boolean {
+    return prefsStore.isConduitEnabled('googleCalendar')
+      && prefsStore.get('googleToken') === '';
+  }
+
   return (
     <Box
       sx={{
-        minWidth: "10em",
+        minWidth: "25em",
         display: "flex",
       }}
     >
@@ -145,17 +152,46 @@ export const DoHotsyncBar = observer(function DoHotsyncBar() {
           ))}
         </Select>
       </FormControl>
-      <Button
-        color="success"
-        size="small"
-        variant="contained"
-        startIcon={<SyncIcon />}
-        sx={{ marginLeft: "10px", width: "14em" }}
-        onClick={handleDoSyncClick}
-        disabled={doingHotsync || selectedDevice === ''}
-      >
-        {!doingHotsync ? <a>Hotsync</a> : <a>Syncing...</a>}
-      </Button>
+      {
+        (!shouldDisplayGoogleLogin()) && (
+          <Button
+            color="success"
+            size="small"
+            variant="contained"
+            startIcon={<SyncIcon />}
+            sx={{ marginLeft: "10px", width: "14em" }}
+            onClick={handleDoSyncClick}
+            disabled={doingHotsync || selectedDevice === ''}
+          >
+            {!doingHotsync ? <a>Hotsync</a> : <a>Syncing...</a>}
+          </Button>
+        )
+      }
+
+      {
+        (shouldDisplayGoogleLogin()) && (
+          <Box
+            sx={{ marginLeft: "10px", width: "14em", marginTop: "4px" }}>
+            <GoogleLogin
+              theme="filled_blue"
+              size="large"
+              text="continue_with"
+              shape="rectangular"
+              useOneTap={false}
+              onSuccess={credentialResponse => {
+                console.log(credentialResponse);
+                prefsStore.set("googleToken", credentialResponse.credential as string);
+                prefsStore.set("googleTokenDate", new Date());
+              }}
+              onError={() => {
+                console.log('Login Failed');
+              }}
+            />
+          </Box>
+
+        )
+      }
+
       <Dialog
         open={open}
         onClose={handleClose}

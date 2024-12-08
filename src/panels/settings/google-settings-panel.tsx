@@ -11,7 +11,7 @@ export function GoogleSettingsPanel() {
   const [integrationEnabled, setIntegrationEnabled] = useState(false);
 
   useEffect(() => {
-    setCurrentClientId(prefsStore.get('googleClientID') as string);
+    setCurrentClientId((prefsStore.get('googleClientID') as string).trim());
     setCurrentSecretKey(prefsStore.get('googleSecretKey') as string);
     setIntegrationEnabled(prefsStore.isConduitEnabled('googleCalendar'));
   }, []);
@@ -55,7 +55,7 @@ export function GoogleSettingsPanel() {
             }} />
         </Grid2>
 
-        <Grid2 size={12} sx={{ '& > :not(style)': { m: 1 } }}>
+        {/* <Grid2 size={12} sx={{ '& > :not(style)': { m: 1 } }}>
           <Typography variant="body1">
             Enter the App Secret Key:
           </Typography>
@@ -63,7 +63,7 @@ export function GoogleSettingsPanel() {
             onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
               setCurrentSecretKey(event.target.value);
             }} />
-        </Grid2>
+        </Grid2> */}
 
         <Grid2 size={12} sx={{ '& > :not(style)': { m: 1 } }}>
           <Button variant="contained" endIcon={<SaveIcon />} size="large" sx={{ height: '6ch', width: '12ch' }} color={saveButtonColor as any} onClick={handleSaveClick}>

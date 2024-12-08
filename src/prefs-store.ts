@@ -7,6 +7,8 @@ export interface Prefs {
   googleClientID: string;
   googleSecretKey: string;
   enabledOptConduits: string[];
+  googleToken: string;
+  googleTokenDate: Date | null;
 }
 
 function getDefaultConnectionString() {
@@ -25,9 +27,11 @@ export const DEFAULT_PREFS: Prefs = Object.freeze({
   connectionString: getDefaultConnectionString(),
   selectedDevice: '',
   iCalendarURL: '',
-  googleClientID: '',
+  googleClientID: ' ',
   googleSecretKey: '',
   enabledOptConduits: [] as string[],
+  googleToken: '',
+  googleTokenDate: null,
 });
 
 class PrefsStore {
