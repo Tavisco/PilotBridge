@@ -18,7 +18,12 @@ import SyncIcon from "@mui/icons-material/Sync";
 import { runSync } from "./run-sync";
 import {
   DlpConnection,
+  DownloadNewResourcesConduit,
+  InstallNewResourcesConduit,
+  SyncDatabasesConduit,
   syncDevice,
+  UpdateClockConduit,
+  UpdateSyncInfoConduit,
 } from "palm-sync";
 import { WebDatabaseStorageImplementation } from "./database-storage/web-db-stg-impl";
 import hotsyncEvents, {
@@ -82,11 +87,11 @@ export const DoHotsyncBar = observer(function DoHotsyncBar() {
         let conduits = [
           new GoogleCalendarConduit(),
           //new ICalendarConduit(),
-          // new SyncDatabasesConduit(),
-          // new DownloadNewResourcesConduit(),
-          // new InstallNewResourcesConduit(),
-          // new UpdateClockConduit(),
-          // new UpdateSyncInfoConduit(),
+          new SyncDatabasesConduit(),
+          new DownloadNewResourcesConduit(),
+          new InstallNewResourcesConduit(),
+          new UpdateClockConduit(),
+          new UpdateSyncInfoConduit(),
         ];
         return await syncDevice(dlpConnection, deviceName, dbStg, conduits);
       });

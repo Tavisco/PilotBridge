@@ -3,7 +3,6 @@ import { Alert, AlertTitle, Box, Button, Typography } from "@mui/material";
 import { Panel } from "../panel";
 import { useEffect, useState } from "react";
 import hotsyncEvents, { HotsyncEvents } from "../event-emitter/hotsync-event-emitter";
-import { useGoogleLogin } from "@react-oauth/google";
 import { Calendar, momentLocalizer } from "react-big-calendar";
 import moment from 'moment';
 import './calendar.css'
@@ -14,14 +13,6 @@ const localizer = momentLocalizer(moment)
 export function CalendarPanel(props: PaperProps) {
     const [hotsyncInProgress, setHotsyncInProgress] = useState(false);
     const [events, setEvents] = useState<any[]>([]);
-
-    // const login = useGoogleLogin({
-    //     onSuccess: async (tokenResponse) => {
-    //         const accessToken = tokenResponse.access_token;
-    //         fetchCalendarEvents(accessToken);
-    //     },
-    //     scope: 'https://www.googleapis.com/auth/calendar.readonly',
-    // });
 
     const fetchCalendarEvents = async () => {
         const accessToken = prefsStore.get("googleToken");
