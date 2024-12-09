@@ -116,10 +116,16 @@ export const DoHotsyncBar = observer(function DoHotsyncBar() {
         scope: 'https://www.googleapis.com/auth/calendar.readonly',
     });
 
-  function shouldDisplayGoogleLogin(): boolean {
-    return prefsStore.isConduitEnabled('googleCalendar')
-      && prefsStore.get('googleToken') === '';
-  }
+    function shouldDisplayGoogleLogin(): boolean {
+      const lastTokenRefresh = prefsStore.get('googleTokenDate') as Date;
+    
+      const isTokenEmpty = prefsStore.get('googleToken') === '';
+      const isMoreThanOneHourOld = lastTokenRefresh
+        ? (Date.now() - new Date(lastTokenRefresh).getTime()) > 3600 * 1000
+        : true;
+    
+      return prefsStore.isConduitEnabled('googleCalendar') && (isTokenEmpty || isMoreThanOneHourOld);
+    }
 
   return (
     <Box
