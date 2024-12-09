@@ -2,32 +2,17 @@ import { ConduitData, ConduitInterface, DatabaseStorageInterface, DlpConnection,
 import { debug } from 'palm-sync';
 import { DatebookDatabase, DatebookRecord, EventTime, RawPdbDatabase } from "palm-pdb";
 import { WebDatabaseStorageImplementation } from "../database-storage/web-db-stg-impl";
+import { prefsStore } from "../prefs-store";
 
 const dbStg = new WebDatabaseStorageImplementation();
 
 export class GoogleCalendarConduit implements ConduitInterface {
     name = 'sync Google calendar';
   
-    private CLIENT_ID = '<CLIENT ID>'; // Replace with your client ID
-    private SCOPES = 'https://www.googleapis.com/auth/calendar.readonly';
-  
-    private tokenClient: any;
-    private gapiInitialized = false;
-    private gisInitialized = false;
   
     async execute(dlpConnection: DlpConnection, conduitData: ConduitData, fs: DatabaseStorageInterface): Promise<void> {
       try {
-        // Initialize GAPI and GIS
-        this.initializeGisClient();
-        await this.initializeGapiClient();
-  
-        // Authenticate and fetch access token
-        const token = await this.getAccessToken();
-  
-        if (!token) {
-          throw new Error('Failed to obtain access token');
-        }
-  
+        
         // Fetch Google Calendar events
         const events = await this.listUpcomingEvents();
   
@@ -74,70 +59,47 @@ export class GoogleCalendarConduit implements ConduitInterface {
       }
     }
   
-    private async initializeGapiClient(): Promise<void> {
-      return new Promise((resolve, reject) => {
-        gapi.load('client', async () => {
-          try {
-            await gapi.client.init({
-              apiKey: '<API KEY>',
-              discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
-            });
-            this.gapiInitialized = true;
-            console.log('gapi ok');
-            resolve();
-          } catch (error) {
-            reject(error);
-          }
-        });
-      });
-    }
-  
-    private initializeGisClient(): void {
-      this.tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: this.CLIENT_ID,
-        scope: this.SCOPES,
-        callback: (response: any) => {
-          if (response.error) {
-            console.error('Error obtaining access token:', response.error);
-          }
-        },
-      });
-      this.gisInitialized = true;
-      console.log('token Client OK');
-    }
-  
-    private async getAccessToken(): Promise<string | null> {
-      return new Promise((resolve, reject) => {
-        if (gapi.client.getToken() === null) {
-          this.tokenClient.callback = (response: any) => {
-            if (response.error) {
-              reject(response.error);
-            } else {
-              resolve(response.access_token);
-            }
-          };
-          this.tokenClient.requestAccessToken({ prompt: 'consent' });
-        } else {
-          resolve(gapi.client.getToken().access_token);
-        }
-      });
-    }
-  
+   
     private async listUpcomingEvents(): Promise<any[]> {
+      // try {
+      //   const request = {
+      //     calendarId: 'primary',
+      //     timeMin: new Date().toISOString(),
+      //     showDeleted: false,
+      //     singleEvents: true,
+      //     maxResults: 10,
+      //     orderBy: 'startTime',
+      //   };
+      //   const response = await gapi.client.calendar.events.list(request);
+      //   return response.result.items || [];
+      // } catch (error) {
+      //   console.error('Error fetching events:', error);
+      //   throw error;
+      // }
+      const accessToken = prefsStore.get("googleToken");
       try {
-        const request = {
-          calendarId: 'primary',
-          timeMin: new Date().toISOString(),
-          showDeleted: false,
-          singleEvents: true,
-          maxResults: 10,
-          orderBy: 'startTime',
-        };
-        const response = await gapi.client.calendar.events.list(request);
-        return response.result.items || [];
+          const startOfWeek = new Date(new Date().setDate(new Date().getDate() - new Date().getDay())).toISOString();
+          const endOfWeek = new Date(new Date().setDate(new Date().getDate() + (30 - new Date().getDay()))).toISOString();
+
+          const response = await fetch(
+              `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${startOfWeek}&timeMax=${endOfWeek}&singleEvents=true&orderBy=startTime`,
+              {
+                  headers: {
+                      Authorization: `Bearer ${accessToken}`,
+                  },
+              }
+          );
+
+          if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const data = await response.json();
+
+         return data.items || [];
       } catch (error) {
-        console.error('Error fetching events:', error);
-        throw error;
+          console.error('Error fetching events:', error);
+          throw error;
       }
     }
   }

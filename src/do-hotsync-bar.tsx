@@ -28,6 +28,7 @@ import { useEffect, useState } from "react";
 import { prefsStore } from "./prefs-store";
 import { GoogleCalendarConduit } from "./conduits/google-calendar-conduit";
 import { GoogleLogin, useGoogleLogin } from "@react-oauth/google";
+import GoogleIcon from '@mui/icons-material/Google';
 
 const dbStg = new WebDatabaseStorageImplementation();
 const addNewDevicePlaceholder = "add_new_device";
@@ -107,12 +108,13 @@ export const DoHotsyncBar = observer(function DoHotsyncBar() {
     }
   };
 
-  const loginWithGoogleAndSync = useGoogleLogin({
-    onSuccess: tokenResponse => {
-      console.log(tokenResponse);
-      handleDoSyncClick();
-    }
-  });
+    const googleLogin = useGoogleLogin({
+        onSuccess: async (tokenResponse) => {
+            prefsStore.set('googleToken', tokenResponse.access_token);
+            prefsStore.set('googleTokenDate', new Date());
+        },
+        scope: 'https://www.googleapis.com/auth/calendar.readonly',
+    });
 
   function shouldDisplayGoogleLogin(): boolean {
     return prefsStore.isConduitEnabled('googleCalendar')
@@ -170,24 +172,18 @@ export const DoHotsyncBar = observer(function DoHotsyncBar() {
 
       {
         (shouldDisplayGoogleLogin()) && (
-          <Box
-            sx={{ marginLeft: "10px", width: "14em", marginTop: "4px" }}>
-            <GoogleLogin
-              theme="filled_blue"
-              size="large"
-              text="continue_with"
-              shape="rectangular"
-              useOneTap={false}
-              onSuccess={credentialResponse => {
-                console.log(credentialResponse);
-                prefsStore.set("googleToken", credentialResponse.credential as string);
-                prefsStore.set("googleTokenDate", new Date());
-              }}
-              onError={() => {
-                console.log('Login Failed');
-              }}
-            />
-          </Box>
+
+            <Button
+              color="info"
+              size="small"
+              variant="contained"
+              startIcon={<GoogleIcon />}
+              sx={{ marginLeft: "10px", width: "17em" }}
+              onClick={() => googleLogin()}
+              disabled={doingHotsync || selectedDevice === ''}
+            >
+              Google Login
+            </Button>
 
         )
       }

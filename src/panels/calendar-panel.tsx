@@ -7,6 +7,7 @@ import { useGoogleLogin } from "@react-oauth/google";
 import { Calendar, momentLocalizer } from "react-big-calendar";
 import moment from 'moment';
 import './calendar.css'
+import { prefsStore } from "../prefs-store";
 
 const localizer = momentLocalizer(moment)
 
@@ -14,15 +15,16 @@ export function CalendarPanel(props: PaperProps) {
     const [hotsyncInProgress, setHotsyncInProgress] = useState(false);
     const [events, setEvents] = useState<any[]>([]);
 
-    const login = useGoogleLogin({
-        onSuccess: async (tokenResponse) => {
-            const accessToken = tokenResponse.access_token;
-            fetchCalendarEvents(accessToken);
-        },
-        scope: 'https://www.googleapis.com/auth/calendar.readonly',
-    });
+    // const login = useGoogleLogin({
+    //     onSuccess: async (tokenResponse) => {
+    //         const accessToken = tokenResponse.access_token;
+    //         fetchCalendarEvents(accessToken);
+    //     },
+    //     scope: 'https://www.googleapis.com/auth/calendar.readonly',
+    // });
 
-    const fetchCalendarEvents = async (accessToken: string) => {
+    const fetchCalendarEvents = async () => {
+        const accessToken = prefsStore.get("googleToken");
         try {
             const startOfWeek = new Date(new Date().setDate(new Date().getDate() - new Date().getDay())).toISOString();
             const endOfWeek = new Date(new Date().setDate(new Date().getDate() + (30 - new Date().getDay()))).toISOString();
@@ -94,7 +96,7 @@ export function CalendarPanel(props: PaperProps) {
                             Setup your google config first in the App settings. The following view is read-only.
                         </Alert>
                         <div className="dark-calendar" style={{ height: '100vh', padding: '20px' }}>
-                            <Button variant="contained" onClick={() => login()} style={{ marginBottom: '20px' }}>
+                            <Button variant="contained" onClick={() => fetchCalendarEvents()} style={{ marginBottom: '20px' }}>
                                 Refresh from Google
                             </Button>
                             <Calendar
