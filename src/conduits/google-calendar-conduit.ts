@@ -8,9 +8,27 @@ const log = debug('palm-sync').extend('conduit').extend('google-calendar');
 const dbStg = new WebDatabaseStorageImplementation();
 const DATEBOOK_DB_NAME = 'DatebookDB.pdb';
 
+function generateUniqueId(apiId: string): number {
+  // FNV-1a hash function
+  let hash = 2166136261; // FNV offset basis
+  for (let i = 0; i < apiId.length; i++) {
+    hash ^= apiId.charCodeAt(i);
+    hash = Math.imul(hash, 16777619); // FNV prime
+  }
+  // Ensure the result fits within the 0xFFFFFF range
+  return Math.abs(hash) % 0xFFFFFF;
+}
+
+function datebookAlreadyHasThatEvent(datebookDb: DatebookDatabase, uniqueId: number): boolean {
+  return datebookDb.records.findIndex((record) => {
+    return uniqueId === record.entry.uniqueId;
+  }) != -1;
+}
+
 export class GoogleCalendarConduit implements ConduitInterface {
   name = 'sync Google calendar';
 
+  
   async execute(dlpConnection: DlpConnection, conduitData: ConduitData, fs: DatabaseStorageInterface): Promise<void> {
     await dlpConnection.execute(DlpOpenConduitReqType.with({}));
     
@@ -24,6 +42,14 @@ export class GoogleCalendarConduit implements ConduitInterface {
       var added = 0;
       events.forEach((event, index) => {
         console.log(event);
+
+        const uniqueId = generateUniqueId(event.id);
+
+        if (datebookAlreadyHasThatEvent(datebookDb, uniqueId)) {
+          log(`Database already has event with id [0x${uniqueId}]. Skipping...`);
+          return;
+        }
+
         const start = new Date(event.start.dateTime || event.start.date);
         const end = event.end.dateTime ? new Date(event.end.dateTime) : undefined;
         const summary = event.summary;
@@ -50,7 +76,7 @@ export class GoogleCalendarConduit implements ConduitInterface {
           });
         }
 
-        record.entry.uniqueId = Math.floor(Math.random() * 0xFFFFFF);
+        record.entry.uniqueId = uniqueId;//Math.floor(Math.random() * 0xFFFFFF);
         record.entry.attributes.dirty = true;
 
         datebookDb.records.push(record);
@@ -97,3 +123,5 @@ export class GoogleCalendarConduit implements ConduitInterface {
     }
   }
 }
+
+
