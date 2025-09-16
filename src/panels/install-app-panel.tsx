@@ -213,7 +213,7 @@ const extractTAIBResource = (
       const flags = dataView.getUint16(offset + 6, false);
       const pixelSize = dataView.getUint8(offset + 8);
       const version = dataView.getUint8(offset + 9);
-      const nextDepthOffset = dataView.getUint16(offset + 10, false);
+      const rawNextDepth = dataView.getUint16(offset + 10, false);
 
       const hasColorTable = Boolean(flags & PilHasColorTable);
       const isCompressed = Boolean(flags & PilCompressed);
@@ -222,7 +222,7 @@ const extractTAIBResource = (
       dbg(
         `depth @${startOffset}: width=${width} height=${height} rowBytes=${rowBytes} pixelSize=${pixelSize} version=${version} flags=0x${flags.toString(
           16
-        )} compressed=${isCompressed} colorTable=${hasColorTable} transparent=${hasTransparency} nextDepthOffsetWords=${nextDepthOffset}`
+        )} compressed=${isCompressed} colorTable=${hasColorTable} transparent=${hasTransparency} nextDepthOffset=${rawNextDepth}`
       );
 
       let transparentIndex: number | null = null;
@@ -235,22 +235,104 @@ const extractTAIBResource = (
         dbg(`  version>=2: transparentIndex=${transparentIndex} compressionType=${compressionType}`);
       }
 
-      let dataStart = offset + headerSize;
+      // --- nextDepth resolution (byte vs dword) ---
+      const multibit = pixelSize > 1;
+      let nextDepthBytes: number | null = null;
+      let cbDst: number | null = null;
+      let dataStart: number | null = null;
+
+      const asBytesCandidate = (() => {
+        const nb = rawNextDepth;
+        if (nb >= headerSize && startOffset + nb <= arrayBuffer.byteLength) return nb;
+        return null;
+      })();
+
+      const asDwordsCandidate = (() => {
+        const nb = rawNextDepth * 4;
+        if (nb >= headerSize && startOffset + nb <= arrayBuffer.byteLength) return nb;
+        return null;
+      })();
+
+      const expectedUncompressedImageBytes = rowBytes * height;
+
+      dbg(`  candidates for interpretation: asBytes=${asBytesCandidate}, asDwords=${asDwordsCandidate}`);
+      if (asBytesCandidate !== null && asDwordsCandidate !== null) {
+        const cbBytes = asBytesCandidate - headerSize;
+        const cbDwords = Math.max(0, (rawNextDepth - 4) << 2);
+
+        dbg(`  both valid -> cbBytes=${cbBytes} cbDwords=${cbDwords} expectedImageBytes=${expectedUncompressedImageBytes}`);
+
+        const bytesCanHoldImage = cbBytes >= expectedUncompressedImageBytes;
+        const dwordsCanHoldImage = cbDwords >= expectedUncompressedImageBytes;
+
+        if (dwordsCanHoldImage && !bytesCanHoldImage) {
+          nextDepthBytes = asDwordsCandidate;
+          cbDst = cbDwords;
+          dataStart = startOffset + headerSize;
+          dbg("  choosing dword interpretation (fits image)");
+        } else if (bytesCanHoldImage && !dwordsCanHoldImage) {
+          nextDepthBytes = asBytesCandidate;
+          cbDst = cbBytes;
+          dataStart = startOffset + headerSize;
+          dbg("  choosing byte interpretation (fits image)");
+        } else if (dwordsCanHoldImage && bytesCanHoldImage) {
+          nextDepthBytes = asDwordsCandidate;
+          cbDst = cbDwords;
+          dataStart = startOffset + headerSize;
+          dbg("  both fit; preferring dword interpretation");
+        } else {
+          if (cbDwords >= cbBytes) {
+            nextDepthBytes = asDwordsCandidate;
+            cbDst = cbDwords;
+            dataStart = startOffset + headerSize;
+            dbg("  neither fits; choosing dword (larger cbDst)");
+          } else {
+            nextDepthBytes = asBytesCandidate;
+            cbDst = cbBytes;
+            dataStart = startOffset + headerSize;
+            dbg("  neither fits; choosing bytes (larger cbDst)");
+          }
+        }
+      } else if (asBytesCandidate !== null) {
+        nextDepthBytes = asBytesCandidate;
+        cbDst = nextDepthBytes - headerSize;
+        dataStart = startOffset + headerSize;
+        dbg("  only byte interpretation valid; selected");
+      } else if (asDwordsCandidate !== null) {
+        nextDepthBytes = asDwordsCandidate;
+        cbDst = Math.max(0, (rawNextDepth - 4) << 2);
+        dataStart = startOffset + headerSize;
+        dbg("  only dword interpretation valid; selected");
+      } else {
+        dataStart = startOffset + headerSize;
+        cbDst = Math.max(0, arrayBuffer.byteLength - dataStart);
+        nextDepthBytes = headerSize + cbDst;
+        dbg("  neither interpretation fits; falling back to remaining buffer");
+      }
+
+      if (cbDst! < 0) cbDst = 0;
+      if (dataStart! > arrayBuffer.byteLength) {
+        dbg(`  depth @${startOffset}: resolved dataStart outside buffer; aborting this candidate`);
+        break;
+      }
+
+      dbg(`  resolved: nextDepthBytes=${nextDepthBytes} cbDst=${cbDst} dataStart=${dataStart} headerSize=${headerSize}`);
+
       let palette: PaletteEntry[] | undefined = undefined;
       let paletteLen = 0;
 
       if (hasColorTable) {
         if (dataStart + 2 > arrayBuffer.byteLength) {
           dbg(`  depth @${startOffset} malformed: not enough bytes for color table count; skipping`);
-          if (!nextDepthOffset) break;
-          offset = offset + nextDepthOffset * 4;
+          if (!nextDepthBytes) break;
+          offset = offset + nextDepthBytes;
           continue;
         }
         const colorCount = dataView.getUint16(dataStart, false);
         dataStart += 2;
         dbg(`  colorCount (raw) = ${colorCount}`);
 
-        if (dataStart + colorCount * 4 <= arrayBuffer.byteLength) {
+        if (dataStart + colorCount * 4 <= arrayBuffer.byteLength && colorCount * 4 <= cbDst!) {
           palette = [];
           let maxComponent = 0;
           for (let i = 0; i < colorCount; i++) {
@@ -267,6 +349,7 @@ const extractTAIBResource = (
           dbg(`  truncated palette: expected ${colorCount * 4} bytes but not available; treating as absent`);
           palette = undefined;
           paletteLen = 0;
+          dataStart = startOffset + headerSize;
         }
       }
 
@@ -275,24 +358,24 @@ const extractTAIBResource = (
       if (isCompressed) {
         if (dataStart + 2 > arrayBuffer.byteLength) {
           dbg(`  depth @${startOffset} malformed: compressed length prefix missing; skipping`);
-          if (!nextDepthOffset) break;
-          offset = offset + nextDepthOffset * 4;
+          if (!nextDepthBytes) break;
+          offset = offset + nextDepthBytes;
           continue;
         }
         const len = dataView.getUint16(dataStart, false);
         if (len < 2) {
           dbg(`  depth @${startOffset} malformed: compressed length ${len} < 2; skipping`);
-          if (!nextDepthOffset) break;
-          offset = offset + nextDepthOffset * 4;
+          if (!nextDepthBytes) break;
+          offset = offset + nextDepthBytes;
           continue;
         }
         const compressedBytesLen = len - 2;
         const compressedStart = dataStart + 2;
         dbg(`  compressed length (including length bytes) = ${len}; compressed payload bytes = ${compressedBytesLen}`);
-        if (compressedStart + compressedBytesLen > arrayBuffer.byteLength) {
+        if (compressedStart + compressedBytesLen > arrayBuffer.byteLength || compressedBytesLen > cbDst!) {
           dbg(`  truncated compressed data; skipping depth`);
-          if (!nextDepthOffset) break;
-          offset = offset + nextDepthOffset * 4;
+          if (!nextDepthBytes) break;
+          offset = offset + nextDepthBytes;
           continue;
         }
         const compressed = new Uint8Array(arrayBuffer, compressedStart, compressedBytesLen);
@@ -313,7 +396,7 @@ const extractTAIBResource = (
       } else {
         const dataLen = rowBytes * height;
         dbg(`  uncompressed: expecting ${dataLen} bytes at offset ${dataStart}`);
-        if (dataStart + dataLen <= arrayBuffer.byteLength) {
+        if (dataStart + dataLen <= arrayBuffer.byteLength && dataLen <= cbDst!) {
           pixelsPacked = new Uint8Array(arrayBuffer, dataStart, dataLen);
           dbg(`  read uncompressed data (${pixelsPacked.length} bytes)`);
         } else {
@@ -323,44 +406,67 @@ const extractTAIBResource = (
       }
 
       if (!pixelsPacked) {
-        if (!nextDepthOffset) break;
-        offset = offset + nextDepthOffset * 4;
+        if (!nextDepthBytes) break;
+        offset = offset + nextDepthBytes;
         continue;
       }
 
       const pixels = unpackPixels(pixelsPacked, pixelSize, width, height, rowBytes);
       dbg(`  unpacked pixels => ${pixels.length} entries (expected ${width * height})`);
 
-      candidates.push({
-        bitmap: {
-          width,
-          height,
-          rowBytes,
-          flags,
-          pixelSize,
-          version,
-          transparentIndex: hasTransparency ? transparentIndex ?? null : null,
-          compressionType: compressionType ?? null,
-          pixels,
-          palette,
-        },
-        pixelSize,
-        paletteLen,
-        version,
-        offset: startOffset,
-      });
+      // --- Validation: skip clearly invalid candidates ---
+      const validPixelSizes = new Set([1, 2, 4, 8]);
+      const expectedPixelCount = width * height;
+      const isValid =
+        width > 0 &&
+        height > 0 &&
+        pixels.length === expectedPixelCount &&
+        validPixelSizes.has(pixelSize);
 
-      dbg(`  candidate added (offset ${startOffset}, pixelSize=${pixelSize}, paletteLen=${paletteLen}, version=${version})`);
+      if (!isValid) {
+        dbg(
+          `  skipping invalid candidate (width=${width},height=${height},pixelSize=${pixelSize},pixels=${pixels.length})`
+        );
+      } else {
+        candidates.push({
+          bitmap: {
+            width,
+            height,
+            rowBytes,
+            flags,
+            pixelSize,
+            version,
+            transparentIndex: hasTransparency ? transparentIndex ?? null : null,
+            compressionType: compressionType ?? null,
+            pixels,
+            palette,
+          },
+          pixelSize,
+          paletteLen,
+          version,
+          offset: startOffset,
+        });
+
+        dbg(`  candidate added (offset ${startOffset}, pixelSize=${pixelSize}, paletteLen=${paletteLen}, version=${version})`);
+      }
     } catch (err) {
       console.error("[tAIB] exception parsing depth at offset", offset, err);
     }
 
-    const nextDepthWords = dataView.getUint16(startOffset + 10, false);
-    if (!nextDepthWords) {
-      dbg("nextDepthOffset==0: stopping depth walk");
+    // Advance using resolved nextDepth if possible
+    const nextDepthWordField = dataView.getUint16(startOffset + 10, false);
+    let advanceBytes: number | null = null;
+    if (typeof (nextDepthBytes as number) === "number" && (nextDepthBytes as number) > 0) {
+      advanceBytes = nextDepthBytes as number;
+    } else if (nextDepthWordField) {
+      advanceBytes = nextDepthWordField * 4;
+    }
+
+    if (!advanceBytes) {
+      dbg("nextDepthOffset==0 or unresolved: stopping depth walk");
       break;
     }
-    const nextOffset = startOffset + nextDepthWords * 4;
+    const nextOffset = startOffset + advanceBytes;
     if (nextOffset <= startOffset || nextOffset >= arrayBuffer.byteLength) {
       dbg("nextDepthOffset leads out-of-range or non-progressive; stopping");
       break;
@@ -401,6 +507,7 @@ const extractTAIBResource = (
 
   return chosen.bitmap;
 };
+
 
 const PLACEHOLDER_SIZE = 22;
 const placeholderBitmap: TAIBBitmap = {
