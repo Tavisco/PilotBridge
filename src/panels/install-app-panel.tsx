@@ -19,6 +19,12 @@ import hotsyncEvents, {
 } from "../event-emitter/hotsync-event-emitter";
 import { prefsStore } from "../prefs-store";
 
+interface PaletteEntry {
+  r: number;
+  g: number;
+  b: number;
+}
+
 interface TAIBBitmap {
   width: number;
   height: number;
@@ -26,14 +32,139 @@ interface TAIBBitmap {
   flags: number;
   pixelSize: number;
   version: number;
-  transparentIndex?: number;
-  compressionType?: number;
-  data: Uint8Array;
+  transparentIndex?: number | null;
+  compressionType?: number | null;
+  pixels: Uint8Array;
+  palette?: PaletteEntry[]; // if provided
 }
+
+const PilCompressed = 0x8000;
+const PilHasColorTable = 0x4000;
+const PilTransparent = 0x2000;
+
+/**
+ * Decompressors follow the same logic used in gifpil.c:
+ * - Scanline compression: flag byte every 8 output bytes group; a set bit means a new byte follows,
+ *   otherwise the byte is copied from the previous scanline.
+ * - RLE compression: each scanline is encoded as pairs <count><value> until the scanline is full.
+ */
+
+function decompressScanline(
+  compressed: Uint8Array,
+  rowBytes: number,
+  height: number
+): Uint8Array {
+  const out = new Uint8Array(rowBytes * height);
+  let p = 0;
+  const prev = new Uint8Array(rowBytes);
+  const cur = new Uint8Array(rowBytes);
+
+  for (let r = 0; r < height; r++) {
+    let sli = 0;
+    while (sli < rowBytes) {
+      if (p >= compressed.length) {
+        // truncated stream => stop early
+        return out;
+      }
+      const db = compressed[p++];
+      for (let rbi = 0; rbi < 8 && sli + rbi < rowBytes; rbi++) {
+        const bit = 1 << (7 - rbi);
+        if (db & bit) {
+          // byte supplied
+          if (p >= compressed.length) {
+            cur[sli + rbi] = 0;
+          } else {
+            cur[sli + rbi] = compressed[p++];
+          }
+        } else {
+          // copy from previous scanline
+          cur[sli + rbi] = prev[sli + rbi];
+        }
+      }
+      sli += 8;
+    }
+    // write cur into out
+    out.set(cur.subarray(0, rowBytes), r * rowBytes);
+    // swap prev / cur (copy)
+    prev.set(cur.subarray(0, rowBytes));
+  }
+
+  return out;
+}
+
+function decompressRLE(
+  compressed: Uint8Array,
+  rowBytes: number,
+  height: number
+): Uint8Array {
+  const out = new Uint8Array(rowBytes * height);
+  let p = 0;
+
+  for (let r = 0; r < height; r++) {
+    let dest = r * rowBytes;
+    let produced = 0;
+    while (produced < rowBytes) {
+      if (p + 1 >= compressed.length) {
+        return out;
+      }
+      const cnt = compressed[p++];
+      const val = compressed[p++];
+      for (let k = 0; k < cnt && produced < rowBytes; k++) {
+        out[dest + produced] = val;
+        produced++;
+      }
+    }
+  }
+
+  return out;
+}
+
+/**
+ * Unpack packed bytes into pixel indices array (width * height).
+ * - `packed` is `rowBytes * height` bytes where each byte contains 8/pixelSize pixels.
+ * - pixelSize is 1,2,4,8.
+ */
+function unpackPixels(
+  packed: Uint8Array,
+  pixelSize: number,
+  width: number,
+  height: number,
+  rowBytes: number
+): Uint8Array {
+  const pixels = new Uint8Array(width * height);
+  const mask = (1 << pixelSize) - 1;
+  const pixelsPerByte = 8 / pixelSize;
+
+  for (let y = 0; y < height; y++) {
+    const rowOffset = y * rowBytes;
+    let px = 0;
+    outer: for (let b = 0; b < rowBytes; b++) {
+      const byte = packed[rowOffset + b];
+      for (let i = 0; i < pixelsPerByte; i++) {
+        const shift = 8 - pixelSize * (i + 1);
+        const val = (byte >> shift) & mask;
+        const x = b * pixelsPerByte + i;
+        if (x >= width) {
+          break outer;
+        }
+        pixels[y * width + x] = val;
+        px++;
+      }
+    }
+  }
+
+  return pixels;
+}
+
+const ENABLE_TAIB_DEBUG = true;
 
 const extractTAIBResource = (
   rawDb: RawPdbDatabase | RawPrcDatabase
 ): TAIBBitmap => {
+  const dbg = (...args: any[]) => {
+    if (ENABLE_TAIB_DEBUG) console.debug("[tAIB]", ...args);
+  };
+
   let element;
   for (let index = 0; index < rawDb.records.length; index++) {
     const record = rawDb.records[index];
@@ -45,6 +176,7 @@ const extractTAIBResource = (
   }
 
   if (!element) {
+    dbg("No tAIB resource found in database", rawDb?.header?.name);
     return {
       width: 22,
       height: 22,
@@ -52,133 +184,408 @@ const extractTAIBResource = (
       flags: 0,
       pixelSize: 1,
       version: 1,
-      transparentIndex: 0,
-      compressionType: 0,
-      data: new Uint8Array(),
-    }; // No "tAIB" resource found.
+      transparentIndex: null,
+      compressionType: null,
+      pixels: new Uint8Array(22 * 22),
+    };
   }
 
-  let dataView = new DataView(element.data.buffer);
-  let arrayBuffer = element.data.buffer;
+  dbg("tAIB resource found; length:", element.data?.length);
 
+  const arrayBuffer = element.data.buffer;
+  const dataView = new DataView(arrayBuffer);
   let offset = 0;
-  while (offset < arrayBuffer.byteLength) {
-    const width = dataView.getUint16(offset, false);
-    const height = dataView.getUint16(offset + 2, false);
-    const rowBytes = dataView.getUint16(offset + 4, false);
-    const flags = dataView.getUint16(offset + 6, false);
-    const pixelSize = dataView.getUint8(offset + 8);
-    const version = dataView.getUint8(offset + 9);
-    // const nextDepthOffset = dataView.getUint16(offset + 10, false);
+  const candidates: {
+    bitmap: TAIBBitmap;
+    pixelSize: number;
+    paletteLen: number;
+    version: number;
+    offset: number;
+  }[] = [];
 
-    let transparentIndex: number | undefined;
-    let compressionType: number | undefined;
+  let loopGuard = 0;
+  while (offset + 12 <= arrayBuffer.byteLength && loopGuard++ < 1000) {
+    const startOffset = offset;
+    try {
+      const width = dataView.getUint16(offset, false);
+      const height = dataView.getUint16(offset + 2, false);
+      const rowBytes = dataView.getUint16(offset + 4, false);
+      const flags = dataView.getUint16(offset + 6, false);
+      const pixelSize = dataView.getUint8(offset + 8);
+      const version = dataView.getUint8(offset + 9);
+      const nextDepthOffset = dataView.getUint16(offset + 10, false);
 
-    if (version >= 2) {
-      transparentIndex = dataView.getUint8(offset + 12);
-      compressionType = dataView.getUint8(offset + 13);
+      const hasColorTable = Boolean(flags & PilHasColorTable);
+      const isCompressed = Boolean(flags & PilCompressed);
+      const hasTransparency = Boolean(flags & PilTransparent);
+
+      dbg(
+        `depth @${startOffset}: width=${width} height=${height} rowBytes=${rowBytes} pixelSize=${pixelSize} version=${version} flags=0x${flags.toString(
+          16
+        )} compressed=${isCompressed} colorTable=${hasColorTable} transparent=${hasTransparency} nextDepthOffsetWords=${nextDepthOffset}`
+      );
+
+      let transparentIndex: number | null = null;
+      let compressionType: number | null = null;
+
+      const headerSize = version >= 2 ? 16 : 12;
+      if (version >= 2) {
+        transparentIndex = dataView.getUint8(offset + 12);
+        compressionType = dataView.getUint8(offset + 13);
+        dbg(`  version>=2: transparentIndex=${transparentIndex} compressionType=${compressionType}`);
+      }
+
+      let dataStart = offset + headerSize;
+      let palette: PaletteEntry[] | undefined = undefined;
+      let paletteLen = 0;
+
+      if (hasColorTable) {
+        if (dataStart + 2 > arrayBuffer.byteLength) {
+          dbg(`  depth @${startOffset} malformed: not enough bytes for color table count; skipping`);
+          if (!nextDepthOffset) break;
+          offset = offset + nextDepthOffset * 4;
+          continue;
+        }
+        const colorCount = dataView.getUint16(dataStart, false);
+        dataStart += 2;
+        dbg(`  colorCount (raw) = ${colorCount}`);
+
+        if (dataStart + colorCount * 4 <= arrayBuffer.byteLength) {
+          palette = [];
+          let maxComponent = 0;
+          for (let i = 0; i < colorCount; i++) {
+            const reserved = dataView.getUint8(dataStart++);
+            const rRaw = dataView.getUint8(dataStart++);
+            const gRaw = dataView.getUint8(dataStart++);
+            const bRaw = dataView.getUint8(dataStart++);
+            palette.push({ r: rRaw, g: gRaw, b: bRaw });
+            maxComponent = Math.max(maxComponent, rRaw, gRaw, bRaw);
+          }
+          dbg(`  palette parsed length=${palette.length} maxComponent=${maxComponent}`);
+          paletteLen = palette.length;
+        } else {
+          dbg(`  truncated palette: expected ${colorCount * 4} bytes but not available; treating as absent`);
+          palette = undefined;
+          paletteLen = 0;
+        }
+      }
+
+      // Now image data
+      let pixelsPacked: Uint8Array | null = null;
+      if (isCompressed) {
+        if (dataStart + 2 > arrayBuffer.byteLength) {
+          dbg(`  depth @${startOffset} malformed: compressed length prefix missing; skipping`);
+          if (!nextDepthOffset) break;
+          offset = offset + nextDepthOffset * 4;
+          continue;
+        }
+        const len = dataView.getUint16(dataStart, false);
+        if (len < 2) {
+          dbg(`  depth @${startOffset} malformed: compressed length ${len} < 2; skipping`);
+          if (!nextDepthOffset) break;
+          offset = offset + nextDepthOffset * 4;
+          continue;
+        }
+        const compressedBytesLen = len - 2;
+        const compressedStart = dataStart + 2;
+        dbg(`  compressed length (including length bytes) = ${len}; compressed payload bytes = ${compressedBytesLen}`);
+        if (compressedStart + compressedBytesLen > arrayBuffer.byteLength) {
+          dbg(`  truncated compressed data; skipping depth`);
+          if (!nextDepthOffset) break;
+          offset = offset + nextDepthOffset * 4;
+          continue;
+        }
+        const compressed = new Uint8Array(arrayBuffer, compressedStart, compressedBytesLen);
+
+        const comp = compressionType ?? 0;
+        dbg(`  using compression method = ${comp === 0 ? "ScanLine" : comp === 1 ? "RLE" : `unknown(${comp})`}`);
+
+        if (comp === 0) {
+          pixelsPacked = decompressScanline(compressed, rowBytes, height);
+          dbg(`  decompressScanline produced ${pixelsPacked?.length ?? 0} bytes`);
+        } else if (comp === 1) {
+          pixelsPacked = decompressRLE(compressed, rowBytes, height);
+          dbg(`  decompressRLE produced ${pixelsPacked?.length ?? 0} bytes`);
+        } else {
+          dbg(`  unknown compression type ${comp}; skipping depth`);
+          pixelsPacked = null;
+        }
+      } else {
+        const dataLen = rowBytes * height;
+        dbg(`  uncompressed: expecting ${dataLen} bytes at offset ${dataStart}`);
+        if (dataStart + dataLen <= arrayBuffer.byteLength) {
+          pixelsPacked = new Uint8Array(arrayBuffer, dataStart, dataLen);
+          dbg(`  read uncompressed data (${pixelsPacked.length} bytes)`);
+        } else {
+          dbg(`  truncated uncompressed data; skipping depth`);
+          pixelsPacked = null;
+        }
+      }
+
+      if (!pixelsPacked) {
+        if (!nextDepthOffset) break;
+        offset = offset + nextDepthOffset * 4;
+        continue;
+      }
+
+      const pixels = unpackPixels(pixelsPacked, pixelSize, width, height, rowBytes);
+      dbg(`  unpacked pixels => ${pixels.length} entries (expected ${width * height})`);
+
+      candidates.push({
+        bitmap: {
+          width,
+          height,
+          rowBytes,
+          flags,
+          pixelSize,
+          version,
+          transparentIndex: hasTransparency ? transparentIndex ?? null : null,
+          compressionType: compressionType ?? null,
+          pixels,
+          palette,
+        },
+        pixelSize,
+        paletteLen,
+        version,
+        offset: startOffset,
+      });
+
+      dbg(`  candidate added (offset ${startOffset}, pixelSize=${pixelSize}, paletteLen=${paletteLen}, version=${version})`);
+    } catch (err) {
+      console.error("[tAIB] exception parsing depth at offset", offset, err);
     }
 
-    const bitmapHeaderSize = version >= 2 ? 16 : 12;
-    const dataStart = offset + bitmapHeaderSize;
-    const dataLength = rowBytes * height;
-
-    const data = new Uint8Array(arrayBuffer, dataStart, dataLength);
-
-    return {
-      width,
-      height,
-      rowBytes,
-      flags,
-      pixelSize,
-      version,
-      transparentIndex,
-      compressionType,
-      data,
-    };
-
-    // Early return to only get the first bitmap because
-    // the rest of the code is not prepared to handle
-    // multiple images
-    // return { bitmaps };
-
-    // offset += bitmapHeaderSize + dataLength;
-
-    // if (nextDepthOffset === 0) {
-    //   break;
-    // }
-
-    // Update offset to the next bitmap's header
-    // offset = dataStart + nextDepthOffset * 4;
+    const nextDepthWords = dataView.getUint16(startOffset + 10, false);
+    if (!nextDepthWords) {
+      dbg("nextDepthOffset==0: stopping depth walk");
+      break;
+    }
+    const nextOffset = startOffset + nextDepthWords * 4;
+    if (nextOffset <= startOffset || nextOffset >= arrayBuffer.byteLength) {
+      dbg("nextDepthOffset leads out-of-range or non-progressive; stopping");
+      break;
+    }
+    dbg(`advancing offset ${startOffset} -> ${nextOffset}`);
+    offset = nextOffset;
   }
 
-  /**
-   * 
-   * {"width":22,"height":22,"rowBytes":4,"flags":0,"pixelSize":1,"version":1,"data":{"0":0,"1":0,"2":0,"3":0,"4":0,"5":0,"6":0,"7":0,"8":1,"9":255,"10":0,"11":0,"12":2,"13":0,"14":192,"15":0,"16":12,"17":0,"18":96,"19":0,"20":24,"21":0,"22":176,"23":0,"24":31,"25":255,"26":48,"27":0,"28":56,"29":1,"30":56,"31":0,"32":56,"33":1,"34":56,"35":0,"36":120,"37":249,"38":60,"39":0,"40":121,"41":9,"42":60,"43":0,"44":121,"45":249,"46":60,"47":0,"48":120,"49":1,"50":60,"51":0,"52":120,"53":1,"54":60,"55":0,"56":127,"57":255,"58":60,"59":0,"60":120,"61":1,"62":60,"63":0,"64":56,"65":1,"66":56,"67":0,"68":56,"69":249,"70":56,"71":0,"72":25,"73":9,"74":48,"75":0,"76":9,"77":249,"78":112,"79":0,"80":8,"81":1,"82":96,"83":0,"84":8,"85":1,"86":128,"87":0}}
-   */
+  dbg("depth walk finished; candidates found:", candidates.length);
+  if (candidates.length === 0) {
+    dbg("No valid candidates parsed; returning placeholder");
+    return {
+      width: 22,
+      height: 22,
+      rowBytes: 3,
+      flags: 0,
+      pixelSize: 1,
+      version: 1,
+      transparentIndex: null,
+      compressionType: null,
+      pixels: new Uint8Array(22 * 22),
+    };
+  }
 
-  return {
-    width: 22,
-    height: 22,
-    rowBytes: 3,
-    flags: 0,
-    pixelSize: 1,
-    version: 1,
-    transparentIndex: 0,
-    compressionType: 0,
-    data: new Uint8Array(),
-  };
-  // console.log(bitmaps);
+  candidates.sort((a, b) => {
+    if (b.pixelSize !== a.pixelSize) return b.pixelSize - a.pixelSize;
+    if (b.paletteLen !== a.paletteLen) return b.paletteLen - a.paletteLen;
+    return b.version - a.version;
+  });
 
-  // return { bitmaps };
+  const chosen = candidates[0];
+  dbg(
+    `chosen candidate offset=${chosen.offset} pixelSize=${chosen.pixelSize} paletteLen=${chosen.paletteLen} version=${chosen.version}`
+  );
+  if (ENABLE_TAIB_DEBUG && chosen.bitmap.palette) {
+    dbg("chosen palette (first 8 entries):", chosen.bitmap.palette.slice(0, 8));
+  }
+
+  return chosen.bitmap;
 };
 
-const drawTAIBBitmap = (canvas: HTMLCanvasElement, bitmap: TAIBBitmap) => {
+const PLACEHOLDER_SIZE = 22;
+const placeholderBitmap: TAIBBitmap = {
+  width: PLACEHOLDER_SIZE,
+  height: PLACEHOLDER_SIZE,
+  rowBytes: 3,
+  flags: 0,
+  pixelSize: 1,
+  version: 1,
+  transparentIndex: null,
+  compressionType: null,
+  pixels: new Uint8Array(PLACEHOLDER_SIZE * PLACEHOLDER_SIZE),
+  palette: undefined,
+};
+
+export function buildPalmOS8BitPalette(): Array<[number, number, number]> {
+  return [
+    [255,255,255], [255,204,255], [255,153,255], [255,102,255],
+    [255,51,255],  [255,0,255],   [255,255,204], [255,204,204],
+    [255,153,204], [255,102,204], [255,51,204],  [255,0,204],
+    [255,255,153], [255,204,153], [255,153,153], [255,102,153],
+    [255,51,153],  [255,0,153],   [204,255,255], [204,204,255],
+    [204,153,255], [204,102,255], [204,51,255],  [204,0,255],
+    [204,255,204], [204,204,204], [204,153,204], [204,102,204],
+    [204,51,204],  [204,0,204],   [204,255,153], [204,204,153],
+    [204,153,153], [204,102,153], [204,51,153],  [204,0,153],
+    [153,255,255], [153,204,255], [153,153,255], [153,102,255],
+    [153,51,255],  [153,0,255],   [153,255,204], [153,204,204],
+    [153,153,204], [153,102,204], [153,51,204],  [153,0,204],
+    [153,255,153], [153,204,153], [153,153,153], [153,102,153],
+    [153,51,153],  [153,0,153],   [102,255,255], [102,204,255],
+    [102,153,255], [102,102,255], [102,51,255],  [102,0,255],
+    [102,255,204], [102,204,204], [102,153,204], [102,102,204],
+    [102,51,204],  [102,0,204],   [102,255,153], [102,204,153],
+    [102,153,153], [102,102,153], [102,51,153],  [102,0,153],
+    [51,255,255],  [51,204,255],  [51,153,255],  [51,102,255],
+    [51,51,255],   [51,0,255],    [51,255,204],  [51,204,204],
+    [51,153,204],  [51,102,204],  [51,51,204],   [51,0,204],
+    [51,255,153],  [51,204,153],  [51,153,153],  [51,102,153],
+    [51,51,153],   [51,0,153],    [0,255,255],   [0,204,255],
+    [0,153,255],   [0,102,255],   [0,51,255],    [0,0,255],
+    [0,255,204],   [0,204,204],   [0,153,204],   [0,102,204],
+    [0,51,204],    [0,0,204],     [0,255,153],   [0,204,153],
+    [0,153,153],   [0,102,153],   [0,51,153],    [0,0,153],
+    [255,255,102], [255,204,102], [255,153,102], [255,102,102],
+    [255,51,102],  [255,0,102],   [255,255,51],  [255,204,51],
+    [255,153,51],  [255,102,51],  [255,51,51],   [255,0,51],
+    [255,255,0],   [255,204,0],   [255,153,0],   [255,102,0],
+    [255,51,0],    [255,0,0],     [204,255,102], [204,204,102],
+    [204,153,102], [204,102,102], [204,51,102],  [204,0,102],
+    [204,255,51],  [204,204,51],  [204,153,51],  [204,102,51],
+    [204,51,51],   [204,0,51],    [204,255,0],   [204,204,0],
+    [204,153,0],   [204,102,0],   [204,51,0],    [204,0,0],
+    [153,255,102], [153,204,102], [153,153,102], [153,102,102],
+    [153,51,102],  [153,0,102],   [153,255,51],  [153,204,51],
+    [153,153,51],  [153,102,51],  [153,51,51],   [153,0,51],
+    [153,255,0],   [153,204,0],   [153,153,0],   [153,102,0],
+    [153,51,0],    [153,0,0],     [102,255,102], [102,204,102],
+    [102,153,102], [102,102,102], [102,51,102],  [102,0,102],
+    [102,255,51],  [102,204,51],  [102,153,51],  [102,102,51],
+    [102,51,51],   [102,0,51],    [102,255,0],   [102,204,0],
+    [102,153,0],   [102,102,0],   [102,51,0],    [102,0,0],
+    [51,255,102],  [51,204,102],  [51,153,102],  [51,102,102],
+    [51,51,102],   [51,0,102],    [51,255,51],   [51,204,51],
+    [51,153,51],   [51,102,51],   [51,51,51],    [51,0,51],
+    [51,255,0],    [51,204,0],    [51,153,0],    [51,102,0],
+    [51,51,0],     [51,0,0],      [0,255,102],   [0,204,102],
+    [0,153,102],   [0,102,102],   [0,51,102],    [0,0,102],
+    [0,255,51],    [0,204,51],    [0,153,51],    [0,102,51],
+    [0,51,51],     [0,0,51],      [0,255,0],     [0,204,0],
+    [0,153,0],     [0,102,0],     [0,51,0],      [17,17,17],
+    [34,34,34],    [68,68,68],    [85,85,85],    [119,119,119],
+    [136,136,136], [170,170,170], [187,187,187], [221,221,221],
+    [238,238,238], [192,192,192], [128,0,0],     [128,0,128],
+    [0,128,0],     [0,128,128],   [0,0,0],       [0,0,0],
+    [0,0,0],       [0,0,0],       [0,0,0],       [0,0,0],
+    [0,0,0],       [0,0,0],       [0,0,0],       [0,0,0],
+    [0,0,0],       [0,0,0],       [0,0,0],       [0,0,0],
+    [0,0,0],       [0,0,0],       [0,0,0],       [0,0,0],
+    [0,0,0],       [0,0,0],       [0,0,0],       [0,0,0],
+    [0,0,0],       [0,0,0],       [0,0,0],       [0,0,0],
+    [0,0,0],       [0,0,0],       [0,0,0],       [0,0,0],
+    [0,0,0],       [0,0,0],       [0,0,0],       [0,0,0]
+  ];
+}
+
+const PALM_OS_8BIT_PALETTE = buildPalmOS8BitPalette();
+
+function palm8BitIndexToRGB(idx: number): [number, number, number] {
+  const i = Math.max(0, Math.min(255, idx | 0));
+  return PALM_OS_8BIT_PALETTE[i];
+}
+
+const drawTAIBBitmap = (canvas: HTMLCanvasElement, bitmap?: TAIBBitmap) => {
+  const bmp = bitmap ?? placeholderBitmap;
+
+  const width = Number(bmp.width) || 0;
+  const height = Number(bmp.height) || 0;
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    canvas.width = PLACEHOLDER_SIZE;
+    canvas.height = PLACEHOLDER_SIZE;
+    const ctx = canvas.getContext("2d");
+    if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    return;
+  }
+
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
-  const { width, height, rowBytes, data } = bitmap;
+  const { pixels, palette, pixelSize = 1, transparentIndex = null } = bmp;
+  if (!pixels || pixels.length < width * height) {
+    drawTAIBBitmap(canvas, placeholderBitmap);
+    return;
+  }
 
-  // Set canvas size to be double the size of the original bitmap
-  const newWidth = width * 2;
-  const newHeight = height * 2;
+  try {
+    const sample = Array.from(pixels.slice(0, Math.min(32, pixels.length)));
+    console.debug("[tAIB] pixel sample indices:", sample);
+  } catch (e) {}
+
+  const scale = 2;
+  const newWidth = Math.max(1, Math.floor(width * scale));
+  const newHeight = Math.max(1, Math.floor(height * scale));
   canvas.width = newWidth;
   canvas.height = newHeight;
 
-  // Create a scaled image data object
-  const imageData = ctx.createImageData(newWidth, newHeight);
-  const pixels = imageData.data;
+  let imageData: ImageData;
+  try {
+    imageData = ctx.createImageData(newWidth, newHeight);
+  } catch (e) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    return;
+  }
+  const out = imageData.data;
 
-  // Iterate over the bitmap data and scale it
+  const maxIndex = (1 << pixelSize) - 1;
+
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      const byteIndex = y * rowBytes + Math.floor(x / 8);
-      const bitIndex = 7 - (x % 8);
+      const idx = pixels[y * width + x] | 0;
+      let r = 0, g = 0, b = 0, a = 255;
 
-      const color = data[byteIndex] & (1 << bitIndex) ? 0 : 255;
+      if (transparentIndex !== null && idx === transparentIndex) {
+        a = 0;
+      } else if (palette && palette.length > 0 && idx < palette.length) {
+        const p = palette[idx];
+        r = p.r; g = p.g; b = p.b;
+      } else if (pixelSize === 8 && (!palette || palette.length === 0)) {
+        [r, g, b] = palm8BitIndexToRGB(idx);
+      } else {
+        let val = 0;
+        if (pixelSize === 1) {
+          val = idx ? 0 : 255;
+        } else if (pixelSize === 2) {
+          const l = Math.round(255 * (1 - idx / 3));
+          val = l;
+        } else if (pixelSize === 4) {
+          const l = Math.round(255 * (1 - idx / 15));
+          val = l;
+        } else {
+          const l = Math.round(255 * (1 - idx / Math.max(1, maxIndex)));
+          val = l;
+        }
+        r = g = b = val;
+      }
 
-      // Calculate the corresponding position in the scaled canvas
-      const newX = x * 2;
-      const newY = y * 2;
-
-      // Set the pixel values for the 2x2 block
-      for (let dy = 0; dy < 2; dy++) {
-        for (let dx = 0; dx < 2; dx++) {
-          const pixelIndex = ((newY + dy) * newWidth + (newX + dx)) * 4;
-          pixels[pixelIndex] = color;
-          pixels[pixelIndex + 1] = color;
-          pixels[pixelIndex + 2] = color;
-          pixels[pixelIndex + 3] = 255; // Alpha channel
+      const baseX = x * scale;
+      const baseY = y * scale;
+      for (let dy = 0; dy < scale; dy++) {
+        for (let dx = 0; dx < scale; dx++) {
+          const px = (baseY + dy) * newWidth + (baseX + dx);
+          const off = px * 4;
+          out[off] = r;
+          out[off + 1] = g;
+          out[off + 2] = b;
+          out[off + 3] = a;
         }
       }
     }
   }
 
-  // Put the scaled image data onto the canvas
   ctx.putImageData(imageData, 0, 0);
 };
 
-const BitmapCanvas: React.FC<{ bitmap: TAIBBitmap }> = ({ bitmap }) => {
+const BitmapCanvas: React.FC<{ bitmap?: TAIBBitmap }> = ({ bitmap }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -187,16 +594,21 @@ const BitmapCanvas: React.FC<{ bitmap: TAIBBitmap }> = ({ bitmap }) => {
     }
   }, [bitmap]);
 
-  return <canvas ref={canvasRef}></canvas>;
+  const cssWidth = (bitmap?.width ?? PLACEHOLDER_SIZE) * 2;
+  const cssHeight = (bitmap?.height ?? PLACEHOLDER_SIZE) * 2;
+
+  return <canvas ref={canvasRef} style={{ width: cssWidth, height: cssHeight }} />;
 };
+
 
 const dbStg = new WebDatabaseStorageImplementation();
 
 export function InstallAppPanel(props: PaperProps) {
   const [hasValidUser, setHasValidUser] = useState<boolean>(true);
   const [filenames, setFilenames] = useState<string[]>([]);
-  const [appNames, setAppNames] = useState<string[]>([]);
-  const [bitmaps, setBitmaps] = useState<TAIBBitmap[]>([]);
+  const [databasesState, setDatabasesState] = useState<
+    (RawPdbDatabase | RawPrcDatabase)[]
+  >([]);
 
   async function renderFiles() {
     const deviceName = prefsStore.get("selectedDevice") as string;
@@ -206,15 +618,13 @@ export function InstallAppPanel(props: PaperProps) {
         deviceName
       );
 
-      setAppNames(databases.flatMap((db) => db.header.name));
       setFilenames(filenames);
-      setBitmaps(databases.flatMap((db) => extractTAIBResource(db)));
+      setDatabasesState(databases);
       setHasValidUser(true);
     } catch (error) {
       setHasValidUser(false);
       setFilenames([]);
-      setAppNames([]);
-      setBitmaps([]);
+      setDatabasesState([]);
     }
   }
 
@@ -239,7 +649,6 @@ export function InstallAppPanel(props: PaperProps) {
 
   const handleRemoveFile = async (index: number) => {
     const deviceName = prefsStore.get("selectedDevice") as string;
-
     await dbStg.removeDatabaseBeforeInstallFromList(
       deviceName,
       filenames[index]
@@ -259,10 +668,7 @@ export function InstallAppPanel(props: PaperProps) {
 
     return () => {
       hotsyncEvents.off(HotsyncEvents.HotsyncFinished, refreshScreen);
-      hotsyncEvents.off(
-        HotsyncEvents.HotsyncUserChanged,
-        refreshScreen
-      );
+      hotsyncEvents.off(HotsyncEvents.HotsyncUserChanged, refreshScreen);
     };
   }, []);
 
@@ -290,49 +696,54 @@ export function InstallAppPanel(props: PaperProps) {
             />
           </Button>
         </Box>
-        <div>
-          {!hasValidUser && (
-            <div
-              style={{
-                display: "grid",
-                placeContent: "center",
-                textAlign: "center",
-                padding: "2em",
-              }}
-            >
-              <Typography variant="h5" gutterBottom>
-                That's a new device! 🎉
-              </Typography>
-              <Typography variant="body1">
-                Please hotsync it first before installing new software.
-              </Typography>
-            </div>
-          )}
-        </div>
+
+        {!hasValidUser && (
+          <div
+            style={{
+              display: "grid",
+              placeContent: "center",
+              textAlign: "center",
+              padding: "2em",
+            }}
+          >
+            <Typography variant="h5" gutterBottom>
+              That's a new device! 🎉
+            </Typography>
+            <Typography variant="body1">
+              Please hotsync it first before installing new software.
+            </Typography>
+          </div>
+        )}
 
         <List>
-          {appNames.map((appName, index) => (
-            <ListItem
-              key={index}
-              secondaryAction={
-                <IconButton
-                  edge="end"
-                  aria-label="delete"
-                  onClick={() => handleRemoveFile(index)}
-                >
-                  <DeleteIcon />
-                </IconButton>
-              }
-            >
-              <ListItemIcon>
-                <BitmapCanvas key={index} bitmap={bitmaps[index]} />
-              </ListItemIcon>
-              <ListItemText
-                primary={`${appName || "Loading..."}`}
-                secondary={`${filenames[index]}`}
-              />
-            </ListItem>
-          ))}
+          {databasesState.map((db, index) => {
+            // derive everything from the database object we have here
+            const appName = db?.header?.name ?? "Loading...";
+            // filenames array is expected to be in same order as databases
+            const filename = filenames[index] ?? "";
+            // extract bitmap on-the-fly from the database (safe — extractor returns placeholder on failure)
+            const bitmap = extractTAIBResource(db);
+
+            return (
+              <ListItem
+                key={`${filename}-${index}`}
+                secondaryAction={
+                  <IconButton
+                    edge="end"
+                    aria-label="delete"
+                    onClick={() => handleRemoveFile(index)}
+                  >
+                    <DeleteIcon />
+                  </IconButton>
+                }
+              >
+                <ListItemIcon>
+                  <BitmapCanvas bitmap={bitmap} />
+                </ListItemIcon>
+                <ListItemText primary={appName} secondary={filename} />
+              </ListItem>
+            );
+          })}
         </List>
       </Box>
     </Panel>
