@@ -178,22 +178,19 @@ const extractTAIBResource = (
   if (!element) {
     dbg("No tAIB resource found in database", rawDb?.header?.name);
     return {
-      width: 22,
-      height: 22,
-      rowBytes: 3,
-      flags: 0,
-      pixelSize: 1,
-      version: 1,
-      transparentIndex: null,
-      compressionType: null,
-      pixels: new Uint8Array(22 * 22),
+      width: 22, height: 22, rowBytes: 3, flags: 0, pixelSize: 1, version: 1,
+      transparentIndex: null, compressionType: null, pixels: new Uint8Array(22 * 22),
     };
   }
 
   dbg("tAIB resource found; length:", element.data?.length);
 
-  const arrayBuffer = element.data.buffer;
-  const dataView = new DataView(arrayBuffer);
+  const dataView = new DataView(
+    element.data.buffer,
+    element.data.byteOffset,
+    element.data.byteLength
+  );
+  
   let offset = 0;
   const candidates: {
     bitmap: TAIBBitmap;
@@ -201,11 +198,11 @@ const extractTAIBResource = (
     paletteLen: number;
     version: number;
     offset: number;
-    density: 'single' | 'double';
+    density: "single" | "double";
   }[] = [];
 
   let loopGuard = 0;
-  while (offset + 12 <= arrayBuffer.byteLength && loopGuard++ < 1000) {
+  while (offset + 10 <= dataView.byteLength && loopGuard++ < 1000) {
     const startOffset = offset;
     try {
       const width = dataView.getUint16(offset, false);
@@ -214,321 +211,148 @@ const extractTAIBResource = (
       const flags = dataView.getUint16(offset + 6, false);
       const pixelSize = dataView.getUint8(offset + 8);
       const version = dataView.getUint8(offset + 9);
-      const rawNextDepth = dataView.getUint16(offset + 10, false);
+
+      let transparentIndex: number | null = null;
+      let compressionType: number | null = null;
+      let headerSize = 16;
+      let nextOffsetDelta = 0;
+
+      if (version === 0) {
+        headerSize = 16;
+        nextOffsetDelta = 0;
+      } else if (version === 1) {
+        if (pixelSize === 255) {
+          dbg(`  depth @${startOffset}: Dummy v1 header found. Skipping 16 bytes.`);
+          offset += 16;
+          continue;
+        }
+        headerSize = 16;
+        nextOffsetDelta = dataView.getUint16(offset + 10, false) * 4;
+      } else if (version === 2) {
+        headerSize = 16;
+        nextOffsetDelta = dataView.getUint16(offset + 10, false) * 4;
+        transparentIndex = dataView.getUint8(offset + 12);
+        compressionType = dataView.getUint8(offset + 13);
+      } else if (version === 3) {
+        headerSize = dataView.getUint8(offset + 10);
+        if (headerSize < 24) headerSize = 24;
+        compressionType = dataView.getUint8(offset + 13);
+        nextOffsetDelta = dataView.getUint32(offset + 20, false);
+      } else {
+        dbg(`  depth @${startOffset}: Unsupported version ${version}.`);
+        break;
+      }
 
       const hasColorTable = Boolean(flags & PilHasColorTable);
       const isCompressed = Boolean(flags & PilCompressed);
       const hasTransparency = Boolean(flags & PilTransparent);
+      const densityMode = (flags & 0x08) !== 0 ? "double" : "single";
 
-      dbg(
-        `depth @${startOffset}: width=${width} height=${height} rowBytes=${rowBytes} pixelSize=${pixelSize} version=${version} flags=0x${flags.toString(
-          16
-        )} compressed=${isCompressed} colorTable=${hasColorTable} transparent=${hasTransparency} nextDepthOffset=${rawNextDepth}`
-      );
+      dbg(`depth @${startOffset}: w=${width} h=${height} rowBytes=${rowBytes} pixelSize=${pixelSize} v=${version} flags=0x${flags.toString(16)} comp=${isCompressed} colors=${hasColorTable} transp=${hasTransparency} nextDelta=${nextOffsetDelta}`);
 
-      let transparentIndex: number | null = null;
-      let compressionType: number | null = null;
-
-      const headerSize = version >= 2 ? 16 : 12;
-      if (version >= 2) {
-        transparentIndex = dataView.getUint8(offset + 12);
-        compressionType = dataView.getUint8(offset + 13);
-        dbg(`  version>=2: transparentIndex=${transparentIndex} compressionType=${compressionType}`);
-      }
-
-      // --- Determine density mode ---
-      const isDoubleDensity = (flags & 0x08) !== 0; // Assuming bit 3 indicates double density
-      const densityMode = isDoubleDensity ? 'double' : 'single';
-      
-      // --- nextDepth resolution (byte vs dword) ---
-      const multibit = pixelSize > 1;
-      let nextDepthBytes: number | null = null;
-      let cbDst: number | null = null;
-      let dataStart: number | null = null;
-
-      const asBytesCandidate = (() => {
-        const nb = rawNextDepth;
-        if (nb >= headerSize && startOffset + nb <= arrayBuffer.byteLength) return nb;
-        return null;
-      })();
-
-      const asDwordsCandidate = (() => {
-        const nb = rawNextDepth * 4;
-        if (nb >= headerSize && startOffset + nb <= arrayBuffer.byteLength) return nb;
-        return null;
-      })();
-
-      const expectedUncompressedImageBytes = rowBytes * height;
-
-      dbg(`  candidates for interpretation: asBytes=${asBytesCandidate}, asDwords=${asDwordsCandidate}`);
-      if (asBytesCandidate !== null && asDwordsCandidate !== null) {
-        const cbBytes = asBytesCandidate - headerSize;
-        const cbDwords = Math.max(0, (rawNextDepth - 4) << 2);
-
-        dbg(`  both valid -> cbBytes=${cbBytes} cbDwords=${cbDwords} expectedImageBytes=${expectedUncompressedImageBytes}`);
-
-        const bytesCanHoldImage = cbBytes >= expectedUncompressedImageBytes;
-        const dwordsCanHoldImage = cbDwords >= expectedUncompressedImageBytes;
-
-        if (dwordsCanHoldImage && !bytesCanHoldImage) {
-          nextDepthBytes = asDwordsCandidate;
-          cbDst = cbDwords;
-          dataStart = startOffset + headerSize;
-          dbg("  choosing dword interpretation (fits image)");
-        } else if (bytesCanHoldImage && !dwordsCanHoldImage) {
-          nextDepthBytes = asBytesCandidate;
-          cbDst = cbBytes;
-          dataStart = startOffset + headerSize;
-          dbg("  choosing byte interpretation (fits image)");
-        } else if (dwordsCanHoldImage && bytesCanHoldImage) {
-          nextDepthBytes = asDwordsCandidate;
-          cbDst = cbDwords;
-          dataStart = startOffset + headerSize;
-          dbg("  both fit; preferring dword interpretation");
-        } else {
-          if (cbDwords >= cbBytes) {
-            nextDepthBytes = asDwordsCandidate;
-            cbDst = cbDwords;
-            dataStart = startOffset + headerSize;
-            dbg("  neither fits; choosing dword (larger cbDst)");
-          } else {
-            nextDepthBytes = asBytesCandidate;
-            cbDst = cbBytes;
-            dataStart = startOffset + headerSize;
-            dbg("  neither fits; choosing bytes (larger cbDst)");
-          }
-        }
-      } else if (asBytesCandidate !== null) {
-        nextDepthBytes = asBytesCandidate;
-        cbDst = nextDepthBytes - headerSize;
-        dataStart = startOffset + headerSize;
-        dbg("  only byte interpretation valid; selected");
-      } else if (asDwordsCandidate !== null) {
-        nextDepthBytes = asDwordsCandidate;
-        cbDst = Math.max(0, (rawNextDepth - 4) << 2);
-        dataStart = startOffset + headerSize;
-        dbg("  only dword interpretation valid; selected");
-      } else {
-        dataStart = startOffset + headerSize;
-        cbDst = Math.max(0, arrayBuffer.byteLength - dataStart);
-        nextDepthBytes = headerSize + cbDst;
-        dbg("  neither interpretation fits; falling back to remaining buffer");
-      }
-
-      if (cbDst! < 0) cbDst = 0;
-      if (dataStart! > arrayBuffer.byteLength) {
-        dbg(`  depth @${startOffset}: resolved dataStart outside buffer; aborting this candidate`);
-        break;
-      }
-
-      dbg(`  resolved: nextDepthBytes=${nextDepthBytes} cbDst=${cbDst} dataStart=${dataStart} headerSize=${headerSize}`);
-
+      let dataStart = startOffset + headerSize;
       let palette: PaletteEntry[] | undefined = undefined;
       let paletteLen = 0;
 
       if (hasColorTable) {
-        if (dataStart + 2 > arrayBuffer.byteLength) {
-          dbg(`  depth @${startOffset} malformed: not enough bytes for color table count; skipping`);
-          if (!nextDepthBytes) break;
-          offset = offset + nextDepthBytes;
-          continue;
-        }
         const colorCount = dataView.getUint16(dataStart, false);
         dataStart += 2;
-        dbg(`  colorCount (raw) = ${colorCount}`);
-
-        if (dataStart + colorCount * 4 <= arrayBuffer.byteLength && colorCount * 4 <= cbDst!) {
-          palette = [];
-          let maxComponent = 0;
-          for (let i = 0; i < colorCount; i++) {
-            const reserved = dataView.getUint8(dataStart++);
-            const rRaw = dataView.getUint8(dataStart++);
-            const gRaw = dataView.getUint8(dataStart++);
-            const bRaw = dataView.getUint8(dataStart++);
-            palette.push({ r: rRaw, g: gRaw, b: bRaw });
-            maxComponent = Math.max(maxComponent, rRaw, gRaw, bRaw);
-          }
-          dbg(`  palette parsed length=${palette.length} maxComponent=${maxComponent}`);
-          paletteLen = palette.length;
-        } else {
-          dbg(`  truncated palette: expected ${colorCount * 4} bytes but not available; treating as absent`);
-          palette = undefined;
-          paletteLen = 0;
-          dataStart = startOffset + headerSize;
+        palette = [];
+        for (let i = 0; i < colorCount; i++) {
+          dataStart++;
+          const rRaw = dataView.getUint8(dataStart++);
+          const gRaw = dataView.getUint8(dataStart++);
+          const bRaw = dataView.getUint8(dataStart++);
+          palette.push({ r: rRaw, g: gRaw, b: bRaw });
         }
+        paletteLen = palette.length;
       }
 
-      // Now image data
+      let cbDst = nextOffsetDelta > 0
+        ? nextOffsetDelta - (dataStart - startOffset)
+        : dataView.byteLength - dataStart;
+
+      if (cbDst < 0) cbDst = dataView.byteLength - dataStart;
+
       let pixelsPacked: Uint8Array | null = null;
       if (isCompressed) {
-        if (dataStart + 2 > arrayBuffer.byteLength) {
-          dbg(`  depth @${startOffset} malformed: compressed length prefix missing; skipping`);
-          if (!nextDepthBytes) break;
-          offset = offset + nextDepthBytes;
-          continue;
-        }
-        const len = dataView.getUint16(dataStart, false);
-        if (len < 2) {
-          dbg(`  depth @${startOffset} malformed: compressed length ${len} < 2; skipping`);
-          if (!nextDepthBytes) break;
-          offset = offset + nextDepthBytes;
-          continue;
-        }
-        const compressedBytesLen = len - 2;
-        const compressedStart = dataStart + 2;
-        dbg(`  compressed length (including length bytes) = ${len}; compressed payload bytes = ${compressedBytesLen}`);
-        if (compressedStart + compressedBytesLen > arrayBuffer.byteLength || compressedBytesLen > cbDst!) {
-          dbg(`  truncated compressed data; skipping depth`);
-          if (!nextDepthBytes) break;
-          offset = offset + nextDepthBytes;
-          continue;
-        }
-        const compressed = new Uint8Array(arrayBuffer, compressedStart, compressedBytesLen);
+        let compressedBytesLen = 0;
+        let compressedStart = dataStart;
 
+        if (dataStart + 2 <= dataView.byteLength) {
+          const len = dataView.getUint16(dataStart, false);
+          if (len >= 2 && len <= cbDst + 2) {
+            compressedBytesLen = len - 2;
+            compressedStart = dataStart + 2;
+          } else {
+            compressedBytesLen = cbDst;
+          }
+        } else {
+          compressedBytesLen = cbDst;
+        }
+
+        const bufferOffset = element.data.byteOffset + compressedStart;
+        const compressed = new Uint8Array(element.data.buffer, bufferOffset, compressedBytesLen);
         const comp = compressionType ?? 0;
-        dbg(`  using compression method = ${comp === 0 ? "ScanLine" : comp === 1 ? "RLE" : `unknown(${comp})`}`);
 
         if (comp === 0) {
           pixelsPacked = decompressScanline(compressed, rowBytes, height);
-          dbg(`  decompressScanline produced ${pixelsPacked?.length ?? 0} bytes`);
         } else if (comp === 1) {
           pixelsPacked = decompressRLE(compressed, rowBytes, height);
-          dbg(`  decompressRLE produced ${pixelsPacked?.length ?? 0} bytes`);
-        } else {
-          dbg(`  unknown compression type ${comp}; skipping depth`);
-          pixelsPacked = null;
         }
       } else {
         const dataLen = rowBytes * height;
-        dbg(`  uncompressed: expecting ${dataLen} bytes at offset ${dataStart}`);
-        if (dataStart + dataLen <= arrayBuffer.byteLength && dataLen <= cbDst!) {
-          pixelsPacked = new Uint8Array(arrayBuffer, dataStart, dataLen);
-          dbg(`  read uncompressed data (${pixelsPacked.length} bytes)`);
-        } else {
-          dbg(`  truncated uncompressed data; skipping depth`);
-          pixelsPacked = null;
+        if (dataStart + dataLen <= dataView.byteLength) {
+          const bufferOffset = element.data.byteOffset + dataStart;
+          pixelsPacked = new Uint8Array(element.data.buffer, bufferOffset, dataLen);
         }
       }
 
-      if (!pixelsPacked) {
-        if (!nextDepthBytes) break;
-        offset = offset + nextDepthBytes;
-        continue;
-      }
-
-      const pixels = unpackPixels(pixelsPacked, pixelSize, width, height, rowBytes);
-      dbg(`  unpacked pixels => ${pixels.length} entries (expected ${width * height})`);
-
-      // --- Validation: skip clearly invalid candidates ---
-      const validPixelSizes = new Set([1, 2, 4, 8]);
-      const expectedPixelCount = width * height;
-      const isValid =
-        width > 0 &&
-        height > 0 &&
-        pixels.length === expectedPixelCount &&
-        validPixelSizes.has(pixelSize);
-
-      if (!isValid) {
-        dbg(
-          `  skipping invalid candidate (width=${width},height=${height},pixelSize=${pixelSize},pixels=${pixels.length})`
-        );
-      } else {
-        candidates.push({
-          bitmap: {
-            width,
-            height,
-            rowBytes,
-            flags,
-            pixelSize,
-            version,
-            transparentIndex: hasTransparency ? transparentIndex ?? null : null,
-            compressionType: compressionType ?? null,
-            pixels,
-            palette,
-          },
-          pixelSize,
-          paletteLen,
-          version,
-          offset: startOffset,
-          density: densityMode
-        });
-
-        dbg(`  candidate added (offset ${startOffset}, pixelSize=${pixelSize}, paletteLen=${paletteLen}, version=${version}, density=${densityMode})`);
-      }
-
-
-    // Advance using resolved nextDepth if possible
-    const nextDepthWordField = dataView.getUint16(startOffset + 10, false);
-    let advanceBytes: number | null = null;
-    
-    // Apply the correct density-specific logic from the C code
-    if (typeof (nextDepthBytes as number) === "number" && (nextDepthBytes as number) > 0) {
-      advanceBytes = nextDepthBytes as number;
-    } else if (nextDepthWordField) {
-      // This is the key change - apply density-specific logic here
-      const isDoubleDensity = (dataView.getUint16(startOffset + 6, false) & 0x08) !== 0;
-      
-      if (isDoubleDensity) {
-        // Double density: use bytes with dword alignment
-        const cbDst = nextDepthWordField;
-        if (cbDst & 3) {
-          advanceBytes = 0x18 + cbDst + 4 - (cbDst & 3);
-        } else {
-          advanceBytes = 0x18 + cbDst;
+      if (pixelsPacked) {
+        const pixels = unpackPixels(pixelsPacked, pixelSize, width, height, rowBytes);
+        const expectedPixelCount = width * height;
+        if (width > 0 && height > 0 && pixels.length === expectedPixelCount) {
+          candidates.push({
+            bitmap: {
+              width, height, rowBytes, flags, pixelSize, version,
+              transparentIndex: hasTransparency ? transparentIndex ?? null : null,
+              compressionType: compressionType ?? null,
+              pixels, palette,
+            },
+            pixelSize, paletteLen, version, offset: startOffset, density: densityMode,
+          });
         }
-      } else {
-        // Single density: use dwords
-        advanceBytes = 4 + (nextDepthWordField >> 2); // This is the original logic
       }
-    }
 
-    if (!advanceBytes) {
-      dbg("nextDepthOffset==0 or unresolved: stopping depth walk");
-      break;
-    }
-    const nextOffset = startOffset + advanceBytes;
-    if (nextOffset <= startOffset || nextOffset >= arrayBuffer.byteLength) {
-      dbg("nextDepthOffset leads out-of-range or non-progressive; stopping");
-      break;
-    }
-    dbg(`advancing offset ${startOffset} -> ${nextOffset}`);
-    offset = nextOffset;
-        } catch (err) {
+      if (nextOffsetDelta <= 0) break;
+      offset = startOffset + nextOffsetDelta;
+
+    } catch (err) {
       console.error("[tAIB] exception parsing depth at offset", offset, err);
+      break;
     }
   }
 
-  dbg("depth walk finished; candidates found:", candidates.length);
   if (candidates.length === 0) {
-    dbg("No valid candidates parsed; returning placeholder");
     return {
-      width: 22,
-      height: 22,
-      rowBytes: 3,
-      flags: 0,
-      pixelSize: 1,
-      version: 1,
-      transparentIndex: null,
-      compressionType: null,
-      pixels: new Uint8Array(22 * 22),
+      width: 22, height: 22, rowBytes: 3, flags: 0, pixelSize: 1, version: 1,
+      transparentIndex: null, compressionType: null, pixels: new Uint8Array(22 * 22),
     };
   }
 
+
   candidates.sort((a, b) => {
+    if (b.version !== a.version) return b.version - a.version;
     if (b.pixelSize !== a.pixelSize) return b.pixelSize - a.pixelSize;
-    if (b.paletteLen !== a.paletteLen) return b.paletteLen - a.paletteLen;
-    return b.version - a.version;
+    
+    const areaA = a.bitmap.width * a.bitmap.height;
+    const areaB = b.bitmap.width * b.bitmap.height;
+    if (areaB !== areaA) return areaB - areaA;
+    
+    return 0;
   });
 
-  const chosen = candidates[0];
-  dbg(
-    `chosen candidate offset=${chosen.offset} pixelSize=${chosen.pixelSize} paletteLen=${chosen.paletteLen} version=${chosen.version} density=${chosen.density}`
-  );
-  if (ENABLE_TAIB_DEBUG && chosen.bitmap.palette) {
-    dbg("chosen palette (first 8 entries):", chosen.bitmap.palette.slice(0, 8));
-  }
-
-  return chosen.bitmap;
+  return candidates[0].bitmap;
 };
 
 
