@@ -691,7 +691,9 @@ export function InstallAppPanel(props: PaperProps) {
                   </IconButton>
                 }
               >
-                <ListItemIcon>
+                <ListItemIcon style={{
+                  marginInlineEnd: "1em"
+                }}>
                   <BitmapCanvas bitmap={bitmap} />
                 </ListItemIcon>
                 <ListItemText primary={appName} secondary={filename} />

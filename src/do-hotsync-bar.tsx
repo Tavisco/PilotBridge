@@ -34,6 +34,7 @@ import { prefsStore } from "./prefs-store";
 import { GoogleCalendarConduit } from "./conduits/google-calendar-conduit";
 import { GoogleLogin, useGoogleLogin } from "@react-oauth/google";
 import GoogleIcon from '@mui/icons-material/Google';
+import { ICalendarConduit } from "./conduits/iCalendar-conduit";
 
 const dbStg = new WebDatabaseStorageImplementation();
 const addNewDevicePlaceholder = "add_new_device";
@@ -86,7 +87,7 @@ export const DoHotsyncBar = observer(function DoHotsyncBar() {
       await runSync(async (dlpConnection: DlpConnection) => {
         let conduits = [
           new GoogleCalendarConduit(),
-          //new ICalendarConduit(),
+          new ICalendarConduit(),
           new SyncDatabasesConduit(),
           new DownloadNewResourcesConduit(),
           new InstallNewResourcesConduit(),
