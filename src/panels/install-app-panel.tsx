@@ -201,6 +201,7 @@ const extractTAIBResource = (
     paletteLen: number;
     version: number;
     offset: number;
+    density: 'single' | 'double';
   }[] = [];
 
   let loopGuard = 0;
@@ -235,6 +236,10 @@ const extractTAIBResource = (
         dbg(`  version>=2: transparentIndex=${transparentIndex} compressionType=${compressionType}`);
       }
 
+      // --- Determine density mode ---
+      const isDoubleDensity = (flags & 0x08) !== 0; // Assuming bit 3 indicates double density
+      const densityMode = isDoubleDensity ? 'double' : 'single';
+      
       // --- nextDepth resolution (byte vs dword) ---
       const multibit = pixelSize > 1;
       let nextDepthBytes: number | null = null;
@@ -445,21 +450,36 @@ const extractTAIBResource = (
           paletteLen,
           version,
           offset: startOffset,
+          density: densityMode
         });
 
-        dbg(`  candidate added (offset ${startOffset}, pixelSize=${pixelSize}, paletteLen=${paletteLen}, version=${version})`);
+        dbg(`  candidate added (offset ${startOffset}, pixelSize=${pixelSize}, paletteLen=${paletteLen}, version=${version}, density=${densityMode})`);
       }
-    } catch (err) {
-      console.error("[tAIB] exception parsing depth at offset", offset, err);
-    }
+
 
     // Advance using resolved nextDepth if possible
     const nextDepthWordField = dataView.getUint16(startOffset + 10, false);
     let advanceBytes: number | null = null;
+    
+    // Apply the correct density-specific logic from the C code
     if (typeof (nextDepthBytes as number) === "number" && (nextDepthBytes as number) > 0) {
       advanceBytes = nextDepthBytes as number;
     } else if (nextDepthWordField) {
-      advanceBytes = nextDepthWordField * 4;
+      // This is the key change - apply density-specific logic here
+      const isDoubleDensity = (dataView.getUint16(startOffset + 6, false) & 0x08) !== 0;
+      
+      if (isDoubleDensity) {
+        // Double density: use bytes with dword alignment
+        const cbDst = nextDepthWordField;
+        if (cbDst & 3) {
+          advanceBytes = 0x18 + cbDst + 4 - (cbDst & 3);
+        } else {
+          advanceBytes = 0x18 + cbDst;
+        }
+      } else {
+        // Single density: use dwords
+        advanceBytes = 4 + (nextDepthWordField >> 2); // This is the original logic
+      }
     }
 
     if (!advanceBytes) {
@@ -473,6 +493,9 @@ const extractTAIBResource = (
     }
     dbg(`advancing offset ${startOffset} -> ${nextOffset}`);
     offset = nextOffset;
+        } catch (err) {
+      console.error("[tAIB] exception parsing depth at offset", offset, err);
+    }
   }
 
   dbg("depth walk finished; candidates found:", candidates.length);
@@ -499,7 +522,7 @@ const extractTAIBResource = (
 
   const chosen = candidates[0];
   dbg(
-    `chosen candidate offset=${chosen.offset} pixelSize=${chosen.pixelSize} paletteLen=${chosen.paletteLen} version=${chosen.version}`
+    `chosen candidate offset=${chosen.offset} pixelSize=${chosen.pixelSize} paletteLen=${chosen.paletteLen} version=${chosen.version} density=${chosen.density}`
   );
   if (ENABLE_TAIB_DEBUG && chosen.bitmap.palette) {
     dbg("chosen palette (first 8 entries):", chosen.bitmap.palette.slice(0, 8));
