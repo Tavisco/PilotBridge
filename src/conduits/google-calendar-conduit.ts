@@ -1,127 +1,194 @@
-import { ConduitData, ConduitInterface, DatabaseStorageInterface, DlpConnection, DlpOpenConduitReqType } from "palm-sync";
+import {
+  ConduitData,
+  ConduitInterface,
+  DatabaseStorageInterface,
+  DlpConnection,
+  DlpOpenConduitReqType,
+  debug,
+} from "palm-sync";
 import { DatebookDatabase, DatebookRecord, EventTime } from "palm-pdb";
 import { WebDatabaseStorageImplementation } from "../database-storage/web-db-stg-impl";
 import { prefsStore } from "../prefs-store";
-import { debug } from 'palm-sync';
 
-const log = debug('palm-sync').extend('conduit').extend('google-calendar');
+const log = debug("palm-sync").extend("conduit").extend("google-calendar");
 const dbStg = new WebDatabaseStorageImplementation();
-const DATEBOOK_DB_NAME = 'DatebookDB.pdb';
+const DATEBOOK_DB_NAME = "DatebookDB.pdb";
+const ONE_HOUR_MS = 60 * 60 * 1000;
+
+type GoogleCalendarEvent = {
+  id: string;
+  summary?: string;
+  start: { dateTime?: string; date?: string };
+  end: { dateTime?: string; date?: string };
+};
 
 function generateUniqueId(apiId: string): number {
-  // FNV-1a hash function
-  let hash = 2166136261; // FNV offset basis
+  let hash = 2166136261;
+
   for (let i = 0; i < apiId.length; i++) {
     hash ^= apiId.charCodeAt(i);
-    hash = Math.imul(hash, 16777619); // FNV prime
+    hash = Math.imul(hash, 16777619);
   }
-  // Ensure the result fits within the 0xFFFFFF range
+
   return Math.abs(hash) % 0xFFFFFF;
 }
 
-function datebookAlreadyHasThatEvent(datebookDb: DatebookDatabase, uniqueId: number): boolean {
-  return datebookDb.records.findIndex((record) => {
-    return uniqueId === record.entry.uniqueId;
-  }) != -1;
+function getCalendarRange() {
+  const start = new Date();
+
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - start.getDay());
+
+  const end = new Date(start);
+  end.setDate(start.getDate() + 30);
+
+  return {
+    timeMin: start.toISOString(),
+    timeMax: end.toISOString(),
+  };
 }
 
-export class GoogleCalendarConduit implements ConduitInterface {
-  name = 'sync Google calendar';
+function toEventRecords(event: GoogleCalendarEvent): DatebookRecord[] {
+  const records: DatebookRecord[] = [];
+  const summary = event.summary?.trim();
+  if (!summary) return [];
 
-  
-  async execute(dlpConnection: DlpConnection, conduitData: ConduitData, fs: DatabaseStorageInterface): Promise<void> {
-    await dlpConnection.execute(DlpOpenConduitReqType.with({}));
-    
-    try {
-      // Fetch Google Calendar events
-      const events = await this.listUpcomingEvents();
+  const isAllDay = !!event.start.date;
 
-      // Process events into DatebookDatabase format
-      const datebookDb = DatebookDatabase.from(await dbStg.getDatabaseBuffer(conduitData.palmID.userName, DATEBOOK_DB_NAME));
-      log('Device datebook opened');
-      var added = 0;
-      events.forEach((event, index) => {
-        console.log(event);
+  let current: Date;
+  let eventEnd: Date;
 
-        const uniqueId = generateUniqueId(event.id);
-
-        if (datebookAlreadyHasThatEvent(datebookDb, uniqueId)) {
-          log(`Database already has event with id [0x${uniqueId}]. Skipping...`);
-          return;
-        }
-
-        const start = new Date(event.start.dateTime || event.start.date);
-        const end = event.end.dateTime ? new Date(event.end.dateTime) : undefined;
-        const summary = event.summary;
-
-        if (!start || !summary) return;
-
-        const record = new DatebookRecord();
-        record.description = summary;
-        record.note = `Note from Google Calendar event #${index}`;
-
-        // Set date and time
-        record.date.year = start.getFullYear();
-        record.date.month = start.getMonth();
-        record.date.dayOfMonth = start.getDate();
-        record.startTime = EventTime.with({
-          hour: start.getHours(),
-          minute: start.getMinutes(),
-        });
-
-        if (end) {
-          record.endTime = EventTime.with({
-            hour: end.getHours(),
-            minute: end.getMinutes(),
-          });
-        }
-
-        record.entry.uniqueId = uniqueId;//Math.floor(Math.random() * 0xFFFFFF);
-        record.entry.attributes.dirty = true;
-
-        datebookDb.records.push(record);
-        added += 1;
-      });
-
-      log(`Successfully inserted [${added}] events from Google Calendar in the datebook!`);
-
-      dbStg.writeDatabaseBuffer(conduitData.palmID.userName, DATEBOOK_DB_NAME, datebookDb.serialize());
-    } catch (error) {
-      console.error('Error syncing with Google Calendar:', error);
+  if (isAllDay) {
+    const [sY, sM, sD] = event.start.date!.split('-').map(Number);
+    const [eY, eM, eD] = event.end.date!.split('-').map(Number);
+    current = new Date(sY, sM - 1, sD, 0, 0, 0);
+    eventEnd = new Date(eY, eM - 1, eD, 0, 0, 0);
+  } else {
+    current = new Date(event.start.dateTime!);
+    eventEnd = new Date(event.end.dateTime!);
+    if (eventEnd.getTime() - current.getTime() < ONE_HOUR_MS) {
+      eventEnd = new Date(current.getTime() + ONE_HOUR_MS);
     }
   }
 
+  while (current < eventEnd) {
+    const record = new DatebookRecord();
+    record.description = summary;
 
-  private async listUpcomingEvents(): Promise<any[]> {
+    record.date.year = current.getFullYear();
+    record.date.month = current.getMonth();
+    record.date.dayOfMonth = current.getDate();
 
-    const accessToken = prefsStore.get("googleToken");
+    if (isAllDay) {
+      record.startTime = EventTime.with({ hour: 0, minute: 0 });
+      record.endTime = EventTime.with({ hour: 23, minute: 59 });
+      record.note = `Google All-day event`;
+    } else {
+      const isFirstDay = records.length === 0;
+
+      record.startTime = EventTime.with({
+        hour: isFirstDay ? current.getHours() : 0,
+        minute: isFirstDay ? current.getMinutes() : 0,
+      });
+      const endOfToday = new Date(current.getFullYear(), current.getMonth(), current.getDate(), 23, 59, 59);
+
+      if (eventEnd <= endOfToday) {
+        record.endTime = EventTime.with({
+          hour: eventEnd.getHours(),
+          minute: eventEnd.getMinutes(),
+        });
+      } else {
+        record.endTime = EventTime.with({ hour: 23, minute: 59 });
+      }
+      record.note = `Sync'd from Google: ${event.id}`;
+    }
+
+    records.push(record);
+
+    current = new Date(current.getFullYear(), current.getMonth(), current.getDate() + 1, 0, 0, 0);
+  }
+
+  return records;
+}
+
+export class GoogleCalendarConduit implements ConduitInterface {
+  name = "sync Google calendar";
+
+  async execute(
+      dlpConnection: DlpConnection,
+      conduitData: ConduitData,
+      fs: DatabaseStorageInterface
+  ): Promise<void> {
+    await dlpConnection.execute(DlpOpenConduitReqType.with({}));
+
     try {
-      const startOfWeek = new Date(new Date().setDate(new Date().getDate() - new Date().getDay())).toISOString();
-      const endOfWeek = new Date(new Date().setDate(new Date().getDate() + (30 - new Date().getDay()))).toISOString();
+      const events = await this.listUpcomingEvents();
+      const datebookDb = DatebookDatabase.from(
+          await dbStg.getDatabaseBuffer(conduitData.palmID.userName, DATEBOOK_DB_NAME)
+      );
 
-      log('Fetching events from Google...');
-      const response = await fetch(
-        `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${startOfWeek}&timeMax=${endOfWeek}&singleEvents=true&orderBy=startTime`,
+      let added = 0;
+
+      for (const event of events) {
+        const generatedRecords = toEventRecords(event);
+
+        for (const [subIndex, record] of generatedRecords.entries()) {
+          const salt = `${event.id}-${record.date.year}${record.date.month}${record.date.dayOfMonth}`;
+          const uniqueId = generateUniqueId(salt);
+
+          const existingRecord = datebookDb.records.find(
+              (r) => r.entry.uniqueId === uniqueId
+          );
+
+          if (existingRecord) {
+            log(`Segment for [0x${uniqueId}] already exists, skipping...`);
+            continue;
+          }
+
+          record.entry.uniqueId = uniqueId;
+          record.entry.attributes.dirty = true;
+
+          datebookDb.records.push(record);
+          added += 1;
+        }
+      }
+
+      log(`Sync complete. Inserted [${added}] total records (including duplicates for multiday).`);
+
+      await dbStg.writeDatabaseBuffer(
+          conduitData.palmID.userName,
+          DATEBOOK_DB_NAME,
+          datebookDb.serialize()
+      );
+    } catch (error) {
+      console.error("Error syncing with Google Calendar:", error);
+    }
+  }
+
+  private async listUpcomingEvents(): Promise<GoogleCalendarEvent[]> {
+    const accessToken = prefsStore.get("googleToken");
+    if (!accessToken) {
+      throw new Error("Missing googleToken");
+    }
+
+    const { timeMin, timeMax } = getCalendarRange();
+
+    log("Fetching events from Google...");
+
+    const response = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime`,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
           },
         }
-      );
+    );
 
-      log('Successfully fetched the calendar events!');
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      return data.items || [];
-    } catch (error) {
-      console.error('Error fetching events:', error);
-      throw error;
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+
+    const data = await response.json();
+    return (data.items ?? []) as GoogleCalendarEvent[];
   }
 }
-
-

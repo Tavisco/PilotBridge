@@ -18,7 +18,7 @@ export function GoogleSettingsPanel() {
 
   const handleSaveClick = () => {
     prefsStore.set('googleClientID', currentClientID);
-    prefsStore.set('googleSecretKey', currentSecretKey);
+
     if (integrationEnabled) {
       prefsStore.enableConduit('googleCalendar');
     } else {

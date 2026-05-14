@@ -12,6 +12,8 @@ import {
   DialogContentText,
   DialogTitle,
   TextField,
+  Tooltip,
+  Chip,
 } from "@mui/material";
 import { observer } from "mobx-react";
 import SyncIcon from "@mui/icons-material/Sync";
@@ -32,12 +34,74 @@ import hotsyncEvents, {
 import { useEffect, useState } from "react";
 import { prefsStore } from "./prefs-store";
 import { GoogleCalendarConduit } from "./conduits/google-calendar-conduit";
-import { GoogleLogin, useGoogleLogin } from "@react-oauth/google";
+import { useGoogleLogin } from "@react-oauth/google";
 import GoogleIcon from '@mui/icons-material/Google';
 import { ICalendarConduit } from "./conduits/iCalendar-conduit";
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import CloudOffIcon from '@mui/icons-material/CloudOff';
 
 const dbStg = new WebDatabaseStorageImplementation();
 const addNewDevicePlaceholder = "add_new_device";
+
+function GoogleLoginButton({ disabled }: { disabled: boolean }) {
+  const googleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      prefsStore.set('googleToken', tokenResponse.access_token);
+      prefsStore.set('googleTokenDate', new Date().toISOString()); // Store as string for safety
+    },
+    scope: 'https://www.googleapis.com/auth/calendar.readonly',
+  });
+
+  return (
+      <Button
+          color="info"
+          size="small"
+          variant="contained"
+          startIcon={<GoogleIcon />}
+          sx={{ marginLeft: "10px", width: "17em" }}
+          onClick={() => googleLogin()}
+          disabled={disabled}
+      >
+        Google Login
+      </Button>
+  );
+}
+
+const GoogleStatusIndicator = observer(() => {
+  const isEnabled = prefsStore.isConduitEnabled('googleCalendar');
+  const hasClientId = !!prefsStore.get('googleClientID');
+  const token = prefsStore.get('googleToken');
+  const lastTokenRefresh = prefsStore.get('googleTokenDate') as string;
+
+  const isExpired = lastTokenRefresh
+      ? (Date.now() - new Date(lastTokenRefresh).getTime()) > 3300 * 1000
+      : true;
+
+  if (!isEnabled) return null;
+
+  if (!hasClientId) {
+    return (
+        <Tooltip title="Google Integration enabled but Client ID is missing in Settings">
+          <ErrorOutlineIcon color="warning" sx={{ mr: 1, alignSelf: 'center' }} />
+        </Tooltip>
+    );
+  }
+
+  if (token && !isExpired) {
+    return (
+        <Tooltip title="Google Calendar Connected">
+          <CheckCircleIcon color="success" sx={{ mr: 1, alignSelf: 'center' }} />
+        </Tooltip>
+    );
+  }
+
+  return (
+      <Tooltip title="Google Authentication Required">
+        <CloudOffIcon color="action" sx={{ mr: 1, alignSelf: 'center' }} />
+      </Tooltip>
+  );
+});
 
 export const DoHotsyncBar = observer(function DoHotsyncBar() {
   const [doingHotsync, setDoingHotsync] = useState(false);
@@ -87,7 +151,7 @@ export const DoHotsyncBar = observer(function DoHotsyncBar() {
       await runSync(async (dlpConnection: DlpConnection) => {
         let conduits = [
           new GoogleCalendarConduit(),
-          new ICalendarConduit(),
+          // new ICalendarConduit(),
           new SyncDatabasesConduit(),
           new DownloadNewResourcesConduit(),
           new InstallNewResourcesConduit(),
@@ -114,91 +178,56 @@ export const DoHotsyncBar = observer(function DoHotsyncBar() {
     }
   };
 
-    const googleLogin = useGoogleLogin({
-        onSuccess: async (tokenResponse) => {
-            prefsStore.set('googleToken', tokenResponse.access_token);
-            prefsStore.set('googleTokenDate', new Date());
-        },
-        scope: 'https://www.googleapis.com/auth/calendar.readonly',
-    });
+  function shouldDisplayGoogleLogin(): boolean {
+    const clientId = prefsStore.get('googleClientID');
+    const lastTokenRefresh = prefsStore.get('googleTokenDate') as string;
+    const isTokenEmpty = !prefsStore.get('googleToken');
 
-    function shouldDisplayGoogleLogin(): boolean {
-      const lastTokenRefresh = prefsStore.get('googleTokenDate') as Date;
-    
-      const isTokenEmpty = prefsStore.get('googleToken') === '';
-      const isMoreThanOneHourOld = lastTokenRefresh
-        ? (Date.now() - new Date(lastTokenRefresh).getTime()) > 3600 * 1000
+    const isAlmostExpired = lastTokenRefresh
+        ? (Date.now() - new Date(lastTokenRefresh).getTime()) > 3300 * 1000
         : true;
-    
-      return prefsStore.isConduitEnabled('googleCalendar') && (isTokenEmpty || isMoreThanOneHourOld);
-    }
+
+    return !!clientId && prefsStore.isConduitEnabled('googleCalendar') && (isTokenEmpty || isAlmostExpired);
+  }
 
   return (
-    <Box
-      sx={{
-        minWidth: "25em",
-        display: "flex",
-      }}
-    >
-      <FormControl
-        fullWidth
-        variant="filled"
-        size="small"
-        disabled={doingHotsync}
-      >
-        <InputLabel id="demo-simple-select-label">User</InputLabel>
-        <Select
-          autoWidth
-          labelId="demo-simple-select-label"
-          id="demo-simple-select"
-          value={selectedDevice}
-          label="User"
-          onChange={handleChange}
-        >
-          <MenuItem value={addNewDevicePlaceholder}>
-            <em>Add new</em>
-          </MenuItem>
+      <Box sx={{ minWidth: "25em", display: "flex", alignItems: "center" }}>
 
-          {knownDevices.map((device) => (
-            <MenuItem key={device} value={device}>
-              {device}
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
-      {
-        (!shouldDisplayGoogleLogin()) && (
-          <Button
-            color="success"
-            size="small"
-            variant="contained"
-            startIcon={<SyncIcon />}
-            sx={{ marginLeft: "10px", width: "14em" }}
-            onClick={handleDoSyncClick}
-            disabled={doingHotsync || selectedDevice === ''}
+        {/* 1. Add the indicator here, at the start of the bar */}
+        <GoogleStatusIndicator />
+
+        <FormControl fullWidth variant="filled" size="small" disabled={doingHotsync}>
+          <InputLabel id="demo-simple-select-label">User</InputLabel>
+          <Select
+              autoWidth
+              labelId="demo-simple-select-label"
+              id="demo-simple-select"
+              value={selectedDevice}
+              label="User"
+              onChange={handleChange}
           >
-            {!doingHotsync ? <a>Hotsync</a> : <a>Syncing...</a>}
-          </Button>
-        )
-      }
+            <MenuItem value={addNewDevicePlaceholder}><em>Add new</em></MenuItem>
+            {knownDevices.map((device) => (
+                <MenuItem key={device} value={device}>{device}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
 
-      {
-        (shouldDisplayGoogleLogin()) && (
-
+        {!shouldDisplayGoogleLogin() ? (
             <Button
-              color="info"
-              size="small"
-              variant="contained"
-              startIcon={<GoogleIcon />}
-              sx={{ marginLeft: "10px", width: "17em" }}
-              onClick={() => googleLogin()}
-              disabled={doingHotsync || selectedDevice === ''}
+                color="success"
+                size="small"
+                variant="contained"
+                startIcon={<SyncIcon />}
+                sx={{ marginLeft: "10px", width: "14em" }}
+                onClick={handleDoSyncClick}
+                disabled={doingHotsync || selectedDevice === ''}
             >
-              Google Login
+              {!doingHotsync ? "Hotsync" : "Syncing..."}
             </Button>
-
-        )
-      }
+        ) : (
+            <GoogleLoginButton disabled={doingHotsync || selectedDevice === ''} />
+        )}
 
       <Dialog
         open={open}
