@@ -1,9 +1,9 @@
-import { Box, IconButton, List, ListItem, ListItemText } from "@mui/material";
+import { Box, IconButton, List, ListItem, ListItemText, Typography } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { useEffect, useState } from "react";
-import { WebDatabaseStorageImplementation } from "../database-storage/web-db-stg-impl";
-import { prefsStore } from "../prefs-store";
-import hotsyncEvents, { HotsyncEvents } from "../event-emitter/hotsync-event-emitter";
+import { WebDatabaseStorageImplementation } from "../../database-storage/web-db-stg-impl";
+import { prefsStore } from "../../prefs-store";
+import hotsyncEvents, { HotsyncEvents } from "../../event-emitter/hotsync-event-emitter";
 
 export function ManagerUsersPanel() {
   const [usernames, setUsernames] = useState<string[]>([]);
@@ -27,6 +27,26 @@ export function ManagerUsersPanel() {
 
   return (
     <Box>
+      <Typography variant="body1">
+        User list:
+      </Typography>
+      {usernames.length == 0 && (
+            <div
+              style={{
+                display: "grid",
+                placeContent: "center",
+                textAlign: "center",
+                padding: "2em",
+              }}
+            >
+              <Typography variant="h6" gutterBottom>
+                No known devices!
+              </Typography>
+              <Typography variant="body1">
+                Go ahead and create a new user!
+              </Typography>
+            </div>
+          )}
       <List>
         {usernames.map((username) => (
           <ListItem

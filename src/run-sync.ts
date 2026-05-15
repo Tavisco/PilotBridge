@@ -14,7 +14,7 @@ export async function runSync(syncFn: SyncFn, opts?: SyncConnectionOptions) {
   }
   try {
     return await createSyncServerAndRunSync(
-      prefsStore.get('connectionString'),
+      prefsStore.get('connectionString') as string,
       async (dlpConnection) => {
         const {sysInfo, userInfo} = dlpConnection;
         const sysDateTime = await dlpConnection.execute(

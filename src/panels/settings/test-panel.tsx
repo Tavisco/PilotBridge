@@ -3,7 +3,7 @@ import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { debug, DlpConnection, readDbList } from "palm-sync";
 import { Fragment, useCallback } from "react";
-import { runSync } from "./../run-sync";
+import { runSync } from "../../run-sync";
 import { Grid2 } from "@mui/material";
 
 const log = debug("result");

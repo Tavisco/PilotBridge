@@ -32,11 +32,15 @@ import MenuIcon from "@mui/icons-material/Menu";
 import InfoIcon from "@mui/icons-material/Info";
 import InstallMobileIcon from "@mui/icons-material/InstallMobile";
 import HomeIcon from '@mui/icons-material/Home';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import { LogViewer } from "./log-viewer";
 import { AboutPanel } from "./panels/about-panel";
 import { HomePanel } from "./panels/home-panel";
 import { SettingsPanel } from "./panels/settings-panel";
 import { TodoPanel } from "./panels/todo-panel";
+import { CalendarPanel } from "./panels/calendar-panel";
+import 'react-big-calendar/lib/css/react-big-calendar.css';
+
 
 function UnsupportedApisBanner() {
   return (
@@ -61,7 +65,7 @@ function UnsupportedApisBanner() {
 }
 
 const ConnectionSelector = observer(function ConnectionSelector() {
-  const connectionString = prefsStore.get("connectionString");
+  const connectionString = prefsStore.get("connectionString") as string;
   const onChange = useCallback((_: unknown, newConnectionString: string) => {
     if (newConnectionString === "usb" || newConnectionString === "serial:web") {
       prefsStore.set("connectionString", newConnectionString);
@@ -150,7 +154,7 @@ export function App() {
               <ListItemText primary="Home" />
             </ListItemButton>
           </ListItem>
-          {/* <ListItem key="calendar" disablePadding>
+          <ListItem key="calendar" disablePadding>
             <ListItemButton
               selected={currentComponent === "calendar"}
               onClick={() => handleListItemClick("calendar")}
@@ -160,7 +164,7 @@ export function App() {
               </ListItemIcon>
               <ListItemText primary="Calendar" />
             </ListItemButton>
-          </ListItem> */}
+          </ListItem>
           {/* <ListItem key="address" disablePadding>
             <ListItemButton
               selected={currentComponent === "address"}
@@ -259,7 +263,7 @@ export function App() {
       case "home":
         return <HomePanel />;
       case "calendar":
-        return <div>WIP Calendar</div>;
+        return <CalendarPanel />;
       case "address":
         return <div>WIP Adress</div>;
       case "todo":
@@ -299,14 +303,6 @@ export function App() {
           >
             <MenuIcon />
           </IconButton>
-          <Box sx={{ flexGrow: 1 }}>
-            <Typography variant="h6" noWrap component="div">
-              PilotBridge
-              <Typography variant="caption" px={1}>
-                V 1.3.0
-              </Typography>
-            </Typography>
-          </Box>
           <DoHotsyncBar />
         </Toolbar>
       </AppBar>
