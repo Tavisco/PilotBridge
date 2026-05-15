@@ -40,6 +40,7 @@ import { TodoPanel } from "./panels/todo-panel";
 import { CalendarPanel } from "./panels/calendar-panel";
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import {ManageAppsPage} from "./panels/manage-apps.tsx";
+import {PrcExplorerPanel} from "./panels/prc-explorer-panel.tsx";
 
 
 function UnsupportedApisBanner() {
@@ -209,6 +210,17 @@ export function App() {
               <ListItemText primary="Manage Apps" />
             </ListItemButton>
           </ListItem>
+          <ListItem key="explore-database" disablePadding>
+            <ListItemButton
+                selected={currentComponent === "explore"}
+                onClick={() => handleListItemClick("explore")}
+            >
+              <ListItemIcon>
+                <InstallMobileIcon />
+              </ListItemIcon>
+              <ListItemText primary="Explore database" />
+            </ListItemButton>
+          </ListItem>
           {/* <ListItem key="retrieve-app" disablePadding>
             <ListItemButton
               selected={currentComponent === "retrieve"}
@@ -278,6 +290,8 @@ export function App() {
         return <SettingsPanel />;
       case "about":
         return <AboutPanel />;
+      case "explore":
+        return <PrcExplorerPanel database={null} />;
       default:
         return <HomePanel />;
     }
