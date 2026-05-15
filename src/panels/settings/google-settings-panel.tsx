@@ -1,4 +1,4 @@
-import { Box, Button, FormControlLabel, FormGroup, Grid2, Switch, TextField, Typography } from "@mui/material";
+import { Box, Button, FormControlLabel, FormGroup, Grid2, Switch } from "@mui/material";
 import SaveIcon from '@mui/icons-material/Save';
 import { prefsStore } from '../../prefs-store';
 import { useEffect, useState } from "react";
