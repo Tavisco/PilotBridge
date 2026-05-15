@@ -303,14 +303,6 @@ export function App() {
           >
             <MenuIcon />
           </IconButton>
-          <Box sx={{ flexGrow: 1 }}>
-            <Typography variant="h6" noWrap component="div">
-              PilotBridge
-              <Typography variant="caption" px={1}>
-                V 1.4.0
-              </Typography>
-            </Typography>
-          </Box>
           <DoHotsyncBar />
         </Toolbar>
       </AppBar>

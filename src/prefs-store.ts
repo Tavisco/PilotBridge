@@ -5,7 +5,6 @@ export interface Prefs {
   selectedDevice: string;
   iCalendarURL: string;
   googleClientID: string;
-  googleSecretKey: string;
   enabledOptConduits: string[];
   googleToken: string;
   googleTokenDate: Date | null;
@@ -27,8 +26,7 @@ export const DEFAULT_PREFS: Prefs = Object.freeze({
   connectionString: getDefaultConnectionString(),
   selectedDevice: '',
   iCalendarURL: '',
-  googleClientID: ' ',
-  googleSecretKey: '',
+  googleClientID: '1048113896747-t31udfrm120jk4pim4ia717utsk439r4.apps.googleusercontent.com',
   enabledOptConduits: [] as string[],
   googleToken: '',
   googleTokenDate: null,
