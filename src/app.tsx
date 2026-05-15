@@ -23,7 +23,6 @@ import React from "react";
 import { observer } from "mobx-react";
 import { UsbIcon, SerialIcon } from "./icons";
 import { prefsStore } from "./prefs-store";
-import { InstallAppPanel } from "./panels/install-app-panel";
 import { DeviceInfoPanel } from "./device-info-panel";
 import { DoHotsyncBar } from "./do-hotsync-bar";
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -40,6 +39,7 @@ import { SettingsPanel } from "./panels/settings-panel";
 import { TodoPanel } from "./panels/todo-panel";
 import { CalendarPanel } from "./panels/calendar-panel";
 import 'react-big-calendar/lib/css/react-big-calendar.css';
+import {ManageAppsPage} from "./panels/manage-apps.tsx";
 
 
 function UnsupportedApisBanner() {
@@ -206,7 +206,7 @@ export function App() {
               <ListItemIcon>
                 <InstallMobileIcon />
               </ListItemIcon>
-              <ListItemText primary="Install App" />
+              <ListItemText primary="Manage Apps" />
             </ListItemButton>
           </ListItem>
           {/* <ListItem key="retrieve-app" disablePadding>
@@ -271,7 +271,7 @@ export function App() {
       case "memo":
         return <div>WIP Memo</div>;
       case "install":
-        return <InstallAppPanel />;
+        return <ManageAppsPage />;
       case "retrieve":
         return <div>WIP Retrieve app</div>;
       case "settings":

@@ -88,8 +88,8 @@ export const PalmIcon: React.FC<{ bitmap?: TAIBBitmap }> = ({ bitmap }) => {
         }
     }, [bitmap]);
 
-    const cssWidth = (bitmap?.width ?? PLACEHOLDER_SIZE) * 2;
-    const cssHeight = (bitmap?.height ?? PLACEHOLDER_SIZE) * 2;
+    const cssWidth = (bitmap?.width ?? PLACEHOLDER_SIZE);
+    const cssHeight = (bitmap?.height ?? PLACEHOLDER_SIZE);
 
     return <canvas ref={canvasRef} style={{ width: cssWidth, height: cssHeight }} />;
 };
