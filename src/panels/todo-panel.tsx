@@ -60,13 +60,15 @@ function EditToolbar(props: EditToolbarProps) {
 }
 
 export function TodoPanel(props: PaperProps) {
-    const [db, setDb] = useState<ToDoDatabase>(new ToDoDatabase);
+    const [db, setDb] = useState<ToDoDatabase>(new ToDoDatabase());
     const [rows, setRows] = useState<Row[]>([]);
     const [rowModesModel, setRowModesModel] = useState<GridRowModesModel>({});
     const [notesModalOpen, setNotesModalOpen] = useState(false);
     const [noteId, setNoteId] = useState<number>();
     const [noteContent, setNoteContent] = useState<string>();
     const [hotsyncInProgress, setHotsyncInProgress] = useState(false);
+    const [hasValidUser, setHasValidUser] = useState<boolean>(true);
+    const getDeviceName = () => prefsStore.get("selectedDevice") as string;
 
     const handleRowEditStop: GridEventListener<'rowEditStop'> = (params, event) => {
         if (params.reason === GridRowEditStopReasons.rowFocusOut) {
@@ -103,7 +105,8 @@ export function TodoPanel(props: PaperProps) {
     };
 
     const processRowUpdate = (handledRow: Row) => {
-        var dbRecord = handledRow.isNew ? new ToDoRecord : db.records.filter((record) => record.entry.uniqueId == handledRow.id)[0]
+        const dbRecord = handledRow.isNew ? new ToDoRecord() : db.records.find((record) => record.entry.uniqueId === handledRow.id);
+        if (!dbRecord) return handledRow;
 
         dbRecord.description = handledRow.description;
         dbRecord.priority = handledRow.priority;
@@ -115,9 +118,7 @@ export function TodoPanel(props: PaperProps) {
         if (handledRow.isNew) {
             db.records.push(dbRecord);
         }
-        
-        const selectedDeviceName = prefsStore.get("selectedDevice") as string;
-        dbStg.writeDatabase(selectedDeviceName, RawPdbDatabase.from(db.serialize()));
+        dbStg.writeDatabase(getDeviceName(), RawPdbDatabase.from(db.serialize()));
 
         const updatedRow = { ...handledRow, isNew: false };
         setRows(rows.map((row) => (row.id === handledRow.id ? updatedRow : row)));
@@ -214,47 +215,66 @@ export function TodoPanel(props: PaperProps) {
     ];
 
     async function loadToDo() {
-        const selectedDeviceName = prefsStore.get("selectedDevice") as string;
-        const tempDb = ToDoDatabase.from(await dbStg.getDatabaseBuffer(selectedDeviceName, 'ToDoDB.pdb'));
-        if (tempDb === undefined) {
-            console.log('Failed to load database!');
+        const selectedDeviceName = getDeviceName();
+
+        if (!selectedDeviceName) {
+            setHasValidUser(false);
+            setRows([]);
             return;
         }
 
-        setDb(tempDb);
+        try {
+            await dbStg.getDatabasesFromInstallList(selectedDeviceName);
 
-        setRows(
-            tempDb.records.map(record => ({
-                id: record.entry.uniqueId,
-                isNew: false,
-                completed: record.isCompleted,
-                priority: record.priority,
-                description: record.description,
-                dueDate: record.dueDate == null ? new Date() : record.dueDate.value,
-            }))
-        );
+            const dbBuffer = await dbStg.getDatabaseBuffer(selectedDeviceName, 'ToDoDB.pdb');
+            const tempDb = ToDoDatabase.from(dbBuffer);
+
+            setHasValidUser(true);
+            setDb(tempDb);
+            setRows(
+                tempDb.records.map(record => ({
+                    id: record.entry.uniqueId,
+                    isNew: false,
+                    completed: record.isCompleted,
+                    priority: record.priority,
+                    description: record.description,
+                    dueDate: record.dueDate == null ? new Date() : record.dueDate.value,
+                }))
+            );
+        } catch (e) {
+            console.error('Failed to load ToDo database for:', selectedDeviceName);
+            setHasValidUser(false);
+            setRows([]);
+        }
     }
 
     useEffect(() => {
+        // Initial load
         loadToDo();
 
-        const refreshScreen = () => {
+        // Handler for when the user picks a different device in the app settings
+        const handleUserChanged = () => {
+            console.log("Device changed, reloading ToDo...");
             loadToDo();
         };
 
-        hotsyncEvents.on(HotsyncEvents.HotsyncUserChanged, refreshScreen);
-        hotsyncEvents.on(HotsyncEvents.HotsyncStarted, () => setHotsyncInProgress(true));
-        hotsyncEvents.on(HotsyncEvents.HotsyncFinished, () => {
+        const handleHotsyncStarted = () => setHotsyncInProgress(true);
+
+        const handleHotsyncFinished = () => {
             setHotsyncInProgress(false);
             loadToDo();
-        });
-
-        return () => {
-            hotsyncEvents.off(HotsyncEvents.HotsyncUserChanged, refreshScreen);
-            hotsyncEvents.off(HotsyncEvents.HotsyncStarted, setHotsyncInProgress);
-            hotsyncEvents.off(HotsyncEvents.HotsyncFinished, setHotsyncInProgress);
         };
 
+        // Listen for device/user changes
+        hotsyncEvents.on(HotsyncEvents.HotsyncUserChanged, handleUserChanged);
+        hotsyncEvents.on(HotsyncEvents.HotsyncStarted, handleHotsyncStarted);
+        hotsyncEvents.on(HotsyncEvents.HotsyncFinished, handleHotsyncFinished);
+
+        return () => {
+            hotsyncEvents.off(HotsyncEvents.HotsyncUserChanged, handleUserChanged);
+            hotsyncEvents.off(HotsyncEvents.HotsyncStarted, handleHotsyncStarted);
+            hotsyncEvents.off(HotsyncEvents.HotsyncFinished, handleHotsyncFinished);
+        };
     }, []);
 
 
@@ -294,7 +314,19 @@ export function TodoPanel(props: PaperProps) {
             sx={{ width: "100%" }}
         >
             <Box>
-            {!hotsyncInProgress && (
+
+                {!hasValidUser && (
+                    <div style={{ display: "grid", placeContent: "center", textAlign: "center", padding: "2em" }}>
+                        <Typography variant="h5" gutterBottom>
+                            That's a new device! 🎉
+                        </Typography>
+                        <Typography variant="body1">
+                            Please hotsync it first.
+                        </Typography>
+                    </div>
+                )}
+
+            {hasValidUser && !hotsyncInProgress && (
                 <div
                     style={{
                         minHeight: "35vh",
@@ -341,7 +373,7 @@ export function TodoPanel(props: PaperProps) {
                 </div>
             )}
 
-            {hotsyncInProgress && (
+            {hasValidUser && hotsyncInProgress && (
                 <div
                 style={{
                     display: "grid",
@@ -359,6 +391,7 @@ export function TodoPanel(props: PaperProps) {
                 </div>
             )}
             </Box>
+
             <Dialog
                 onClose={handleNotesClose}
                 aria-labelledby="customized-dialog-title"
