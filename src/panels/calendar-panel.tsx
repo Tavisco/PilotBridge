@@ -1,5 +1,5 @@
 import { PaperProps } from "@mui/material/Paper";
-import { Box, Stack, Typography } from "@mui/material";
+import { Box, Typography } from "@mui/material";
 import { Panel } from "../panel";
 import { useEffect, useMemo, useState } from "react";
 import hotsyncEvents, { HotsyncEvents } from "../event-emitter/hotsync-event-emitter";
@@ -24,7 +24,6 @@ type CalendarEvent = {
 export function CalendarPanel(props: PaperProps) {
     const [hotsyncInProgress, setHotsyncInProgress] = useState(false);
     const [deviceEvents, setDeviceEvents] = useState<CalendarEvent[]>([]);
-    const [loadingDevice, setLoadingDevice] = useState(false);
     const [hasValidUser, setHasValidUser] = useState<boolean>(true);
 
     const deviceName = prefsStore.get("selectedDevice") as string;
@@ -35,7 +34,6 @@ export function CalendarPanel(props: PaperProps) {
     const loadDeviceCalendarEvents = async () => {
         if (!deviceName) return;
 
-        setLoadingDevice(true);
         try {
             const dbBuffer = await dbStg.getDatabaseBuffer(deviceName, DATEBOOK_DB_NAME);
             const datebookDb = DatebookDatabase.from(dbBuffer);
@@ -67,13 +65,11 @@ export function CalendarPanel(props: PaperProps) {
                         source: "device" as const,
                     };
                 })
-                .filter((event: CalendarEvent | null): event is CalendarEvent => event !== null);
+                .filter((event: CalendarEvent | null): event is CalendarEvent => event !== null) as CalendarEvent[];
 
             setDeviceEvents(formattedEvents);
         } catch (error) {
             console.error("Error loading device calendar:", error);
-        } finally {
-            setLoadingDevice(false);
         }
     };
 

@@ -117,9 +117,9 @@ export class GoogleCalendarConduit implements ConduitInterface {
   async execute(
       dlpConnection: DlpConnection,
       conduitData: ConduitData,
-      fs: DatabaseStorageInterface
+      _fs: DatabaseStorageInterface
   ): Promise<void> {
-    await dlpConnection.execute(DlpOpenConduitReqType.with({}));
+    await dlpConnection.execute(new DlpOpenConduitReqType());
 
     try {
       const events = await this.listUpcomingEvents();
@@ -132,7 +132,7 @@ export class GoogleCalendarConduit implements ConduitInterface {
       for (const event of events) {
         const generatedRecords = toEventRecords(event);
 
-        for (const [subIndex, record] of generatedRecords.entries()) {
+        for (const [_subIndex, record] of generatedRecords.entries()) {
           const salt = `${event.id}-${record.date.year}${record.date.month}${record.date.dayOfMonth}`;
           const uniqueId = generateUniqueId(salt);
 

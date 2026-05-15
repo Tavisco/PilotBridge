@@ -8,7 +8,7 @@ import { DatebookDatabase, DatebookRecord, EventTime } from "palm-pdb";
 
 export class ICalendarConduit implements ConduitInterface {
     name = 'sync iCalendar file';
-    async execute(dlpConnection: DlpConnection, conduitData: ConduitData, fs: DatabaseStorageInterface): Promise<void> {
+    async execute(_dlpConnection: DlpConnection, _conduitData: ConduitData, _fs: DatabaseStorageInterface): Promise<void> {
 
         try {
             // Replace with the URL of your iCalendar file

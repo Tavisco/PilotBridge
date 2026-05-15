@@ -1,8 +1,8 @@
 import {
-  DlpGetSysDateTimeReqType,
-  SyncConnectionOptions,
-  SyncFn,
-  createSyncServerAndRunSync,
+    DlpGetSysDateTimeReqType,
+    SyncConnectionOptions,
+    SyncFn,
+    createSyncServerAndRunSync,
 } from 'palm-sync';
 import {deviceInfoStore} from './device-info-store';
 import {logStore} from './log-store';
@@ -18,7 +18,7 @@ export async function runSync(syncFn: SyncFn, opts?: SyncConnectionOptions) {
       async (dlpConnection) => {
         const {sysInfo, userInfo} = dlpConnection;
         const sysDateTime = await dlpConnection.execute(
-          DlpGetSysDateTimeReqType.with({})
+          new DlpGetSysDateTimeReqType()
         );
         deviceInfoStore.update({sysInfo, userInfo, sysDateTime});
         return syncFn(dlpConnection);
