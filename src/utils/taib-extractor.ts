@@ -15,6 +15,7 @@ export interface TAIBBitmap {
     version: number;
     transparentIndex?: number | null;
     compressionType?: number | null;
+    density?: number | null;
     pixels: Uint8Array;
     palette?: PaletteEntry[];
 }
@@ -22,9 +23,11 @@ export interface TAIBBitmap {
 const PilCompressed = 0x8000;
 const PilHasColorTable = 0x4000;
 const PilTransparent = 0x2000;
+
 const ENABLE_TAIB_DEBUG = true;
 
 export const PLACEHOLDER_SIZE = 22;
+
 export const placeholderBitmap: TAIBBitmap = {
     width: PLACEHOLDER_SIZE,
     height: PLACEHOLDER_SIZE,
@@ -34,11 +37,33 @@ export const placeholderBitmap: TAIBBitmap = {
     version: 1,
     transparentIndex: null,
     compressionType: null,
+    density: 72,
     pixels: new Uint8Array(PLACEHOLDER_SIZE * PLACEHOLDER_SIZE),
     palette: undefined,
 };
 
-function decompressScanline(compressed: Uint8Array, rowBytes: number, height: number): Uint8Array {
+function dbg(...args: any[]) {
+    if (ENABLE_TAIB_DEBUG) {
+        console.debug("[tAIB]", ...args);
+    }
+}
+
+function toUint8Array(
+    input: Uint8Array | ArrayBuffer | ArrayBufferView | number[] | Buffer
+): Uint8Array {
+    if (input instanceof Uint8Array) return input;
+    if (input instanceof ArrayBuffer) return new Uint8Array(input);
+    if (ArrayBuffer.isView(input)) {
+        return new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
+    }
+    return Uint8Array.from(input);
+}
+
+function decompressScanline(
+    compressed: Uint8Array,
+    rowBytes: number,
+    height: number
+): Uint8Array {
     const out = new Uint8Array(rowBytes * height);
     let p = 0;
     const prev = new Uint8Array(rowBytes);
@@ -66,7 +91,11 @@ function decompressScanline(compressed: Uint8Array, rowBytes: number, height: nu
     return out;
 }
 
-function decompressRLE(compressed: Uint8Array, rowBytes: number, height: number): Uint8Array {
+function decompressRLE(
+    compressed: Uint8Array,
+    rowBytes: number,
+    height: number
+): Uint8Array {
     const out = new Uint8Array(rowBytes * height);
     let p = 0;
 
@@ -86,7 +115,11 @@ function decompressRLE(compressed: Uint8Array, rowBytes: number, height: number)
     return out;
 }
 
-function decompressPackBits(compressed: Uint8Array, rowBytes: number, height: number): Uint8Array {
+function decompressPackBits(
+    compressed: Uint8Array,
+    rowBytes: number,
+    height: number
+): Uint8Array {
     const out = new Uint8Array(rowBytes * height);
     let p = 0;
     let dest = 0;
@@ -112,14 +145,19 @@ function decompressPackBits(compressed: Uint8Array, rowBytes: number, height: nu
     return out;
 }
 
-function unpackPixels(packed: Uint8Array, pixelSize: number, width: number, height: number, rowBytes: number): Uint8Array {
+function unpackPixels(
+    packed: Uint8Array,
+    pixelSize: number,
+    width: number,
+    height: number,
+    rowBytes: number
+): Uint8Array {
     const pixels = new Uint8Array(width * height);
     const mask = (1 << pixelSize) - 1;
     const pixelsPerByte = 8 / pixelSize;
 
     for (let y = 0; y < height; y++) {
         const rowOffset = y * rowBytes;
-        let px = 0;
         outer: for (let b = 0; b < rowBytes; b++) {
             const byte = packed[rowOffset + b];
             for (let i = 0; i < pixelsPerByte; i++) {
@@ -128,40 +166,36 @@ function unpackPixels(packed: Uint8Array, pixelSize: number, width: number, heig
                 const x = b * pixelsPerByte + i;
                 if (x >= width) break outer;
                 pixels[y * width + x] = val;
-                px++;
             }
         }
     }
     return pixels;
 }
 
-export const extractTAIBResource = (rawDb: RawPdbDatabase | RawPrcDatabase): TAIBBitmap => {
-    const dbg = (...args: any[]) => {
-        if (ENABLE_TAIB_DEBUG) console.debug("[tAIB]", ...args);
-    };
+function scoreBitmapForDefaultPick(b: TAIBBitmap): number {
+    const densityScore = b.density ?? 72;
+    const versionScore = b.version;
+    const pixelSizeScore = b.pixelSize;
+    const areaScore = b.width * b.height;
 
-    let element;
-    for (let index = 0; index < rawDb.records.length; index++) {
-        const record = rawDb.records[index];
-        const entries = record.entry as RsrcEntryType;
-        if (entries.type === "tAIB" && entries.resourceId == 1000) {
-            element = record;
-            break;
-        }
-    }
+    // Higher density first, then newer version, then richer color depth, then larger image.
+    return (densityScore * 1_000_000) + (versionScore * 10_000) + (pixelSizeScore * 100) + areaScore;
+}
 
-    if (!element) {
-        dbg("No tAIB resource found in database", rawDb?.header?.name);
-        return placeholderBitmap;
-    }
+function parseTAIBResourceBytes(resourceBytes: Uint8Array): TAIBBitmap[] {
+    const dataView = new DataView(
+        resourceBytes.buffer,
+        resourceBytes.byteOffset,
+        resourceBytes.byteLength
+    );
 
-    const dataView = new DataView(element.data.buffer, element.data.byteOffset, element.data.byteLength);
     let offset = 0;
-    const candidates: any[] = [];
+    const candidates: TAIBBitmap[] = [];
     let loopGuard = 0;
 
     while (offset + 10 <= dataView.byteLength && loopGuard++ < 1000) {
         const startOffset = offset;
+
         try {
             const width = dataView.getUint16(offset, false);
             const height = dataView.getUint16(offset + 2, false);
@@ -179,7 +213,10 @@ export const extractTAIBResource = (rawDb: RawPdbDatabase | RawPrcDatabase): TAI
                 // Legacy v0 parsing fallback structure mapping
                 nextOffsetDelta = 0;
             } else if (version === 1) {
-                if (pixelSize === 255) { offset += 16; continue; }
+                if (pixelSize === 255) {
+                    offset += 16;
+                    continue;
+                }
                 nextOffsetDelta = dataView.getUint16(offset + 10, false) * 4;
             } else if (version === 2) {
                 nextOffsetDelta = dataView.getUint16(offset + 10, false) * 4;
@@ -189,7 +226,6 @@ export const extractTAIBResource = (rawDb: RawPdbDatabase | RawPrcDatabase): TAI
                 headerSize = Math.max(24, dataView.getUint8(offset + 10));
                 compressionType = dataView.getUint8(offset + 13);
 
-                // Extract 32-bit transparentValue; parse lower byte for indexed sizes
                 const transparentValue = dataView.getUint32(offset + 16, false);
                 transparentIndex = pixelSize <= 8 ? (transparentValue & 0xFF) : transparentValue;
 
@@ -201,36 +237,45 @@ export const extractTAIBResource = (rawDb: RawPdbDatabase | RawPrcDatabase): TAI
             const hasColorTable = Boolean(flags & PilHasColorTable);
             const isCompressed = Boolean(flags & PilCompressed);
             const hasTransparency = Boolean(flags & PilTransparent);
-            const densityMode = (flags & 0x08) !== 0 ? "double" : "single";
+
+            const density =
+                (flags & 0x08) !== 0
+                    ? 144
+                    : (width >= 33 || height >= 33)
+                        ? 108
+                        : 72;
 
             let dataStart = startOffset + headerSize;
             let palette: PaletteEntry[] | undefined = undefined;
-            let paletteLen = 0;
 
             if (hasColorTable) {
                 const colorCount = dataView.getUint16(dataStart, false);
                 dataStart += 2;
                 palette = [];
+
                 for (let i = 0; i < colorCount; i++) {
-                    dataStart++; // Advance past internal index padding flag field
+                    dataStart++; // internal index/padding byte
                     palette.push({
                         r: dataView.getUint8(dataStart++),
                         g: dataView.getUint8(dataStart++),
                         b: dataView.getUint8(dataStart++)
                     });
                 }
-                paletteLen = palette.length;
             }
 
-            let cbDst = nextOffsetDelta > 0 ? nextOffsetDelta - (dataStart - startOffset) : dataView.byteLength - dataStart;
+            let cbDst = nextOffsetDelta > 0
+                ? nextOffsetDelta - (dataStart - startOffset)
+                : dataView.byteLength - dataStart;
+
             if (cbDst < 0) cbDst = dataView.byteLength - dataStart;
 
             let pixelsPacked: Uint8Array | null = null;
+
             if (isCompressed) {
                 let compressedBytesLen = cbDst;
                 let compressedStart = dataStart;
 
-                // Version 3 uses a 32-bit compressed length prefix instead of a 16-bit word
+                // Version 3 uses a 32-bit compressed length prefix instead of a 16-bit word.
                 if (version === 3) {
                     if (dataStart + 4 <= dataView.byteLength) {
                         const len = dataView.getUint32(dataStart, false);
@@ -249,8 +294,12 @@ export const extractTAIBResource = (rawDb: RawPdbDatabase | RawPrcDatabase): TAI
                     }
                 }
 
-                const bufferOffset = element.data.byteOffset + compressedStart;
-                const compressed = new Uint8Array(element.data.buffer, bufferOffset, compressedBytesLen);
+                const compressed = new Uint8Array(
+                    resourceBytes.buffer,
+                    resourceBytes.byteOffset + compressedStart,
+                    compressedBytesLen
+                );
+
                 const comp = compressionType ?? 0;
 
                 if (comp === 0) pixelsPacked = decompressScanline(compressed, rowBytes, height);
@@ -259,47 +308,112 @@ export const extractTAIBResource = (rawDb: RawPdbDatabase | RawPrcDatabase): TAI
             } else {
                 const dataLen = rowBytes * height;
                 if (dataStart + dataLen <= dataView.byteLength) {
-                    pixelsPacked = new Uint8Array(element.data.buffer, element.data.byteOffset + dataStart, dataLen);
+                    pixelsPacked = new Uint8Array(
+                        resourceBytes.buffer,
+                        resourceBytes.byteOffset + dataStart,
+                        dataLen
+                    );
                 }
             }
 
             if (pixelsPacked) {
                 const pixels = unpackPixels(pixelsPacked, pixelSize, width, height, rowBytes);
+
                 if (width > 0 && height > 0 && pixels.length === width * height) {
                     candidates.push({
-                        bitmap: {
-                            width,
-                            height,
-                            rowBytes,
-                            flags,
-                            pixelSize,
-                            version,
-                            transparentIndex: hasTransparency ? transparentIndex : null,
-                            compressionType,
-                            pixels,
-                            palette
-                        },
-                        pixelSize, paletteLen, version, offset: startOffset, density: densityMode,
+                        width,
+                        height,
+                        rowBytes,
+                        flags,
+                        pixelSize,
+                        version,
+                        transparentIndex: hasTransparency ? transparentIndex : null,
+                        compressionType,
+                        density,
+                        pixels,
+                        palette
                     });
                 }
             }
 
-            if (nextOffsetDelta <= 0) break;
-            offset = startOffset + nextOffsetDelta;
+            if (version === 0 || nextOffsetDelta <= 0) {
+                break;
+            }
 
+            offset = startOffset + nextOffsetDelta;
         } catch (err) {
-            console.error("[tAIB] exception parsing depth", err);
+            dbg("exception parsing depth", err);
             break;
         }
     }
 
-    if (candidates.length === 0) return placeholderBitmap;
+    return candidates;
+}
 
-    candidates.sort((a, b) => {
-        if (b.version !== a.version) return b.version - a.version;
-        if (b.pixelSize !== a.pixelSize) return b.pixelSize - a.pixelSize;
-        return (b.bitmap.width * b.bitmap.height) - (a.bitmap.width * a.bitmap.height);
-    });
+export function extractAllTAIBBitmapsFromResource(
+    resourceData: Uint8Array | ArrayBuffer | ArrayBufferView | number[] | Buffer
+): TAIBBitmap[] {
+    return parseTAIBResourceBytes(toUint8Array(resourceData))
+        .slice()
+        .sort((a, b) => {
+            const da = a.density ?? 72;
+            const db = b.density ?? 72;
+            if (db !== da) return db - da;
+            if (b.version !== a.version) return b.version - a.version;
+            if (b.pixelSize !== a.pixelSize) return b.pixelSize - a.pixelSize;
+            return (b.width * b.height) - (a.width * a.height);
+        });
+}
 
-    return candidates[0].bitmap;
+export function extractTAIBBitmapsFromDb(
+    rawDb: RawPdbDatabase | RawPrcDatabase,
+    resourceId?: number
+): TAIBBitmap[] {
+    for (let index = 0; index < rawDb.records.length; index++) {
+        const record = rawDb.records[index];
+        const entries = record.entry as RsrcEntryType;
+
+        if (entries.type !== "tAIB") continue;
+        if (resourceId !== undefined && entries.resourceId !== resourceId) continue;
+
+        return extractAllTAIBBitmapsFromResource(record.data as any);
+    }
+
+    return [];
+}
+
+export function extractTAIBResourceById(
+    rawDb: RawPdbDatabase | RawPrcDatabase,
+    resourceId: number
+): TAIBBitmap[] {
+    return extractTAIBBitmapsFromDb(rawDb, resourceId);
+}
+
+/*
+ * Backward-compatible API:
+ * - Prefer the classic resource ID 1000
+ * - Fall back to any tAIB resource if 1000 is absent
+ * - Return the highest-density decoded bitmap as the single default
+ */
+export const extractTAIBResource = (
+    rawDb: RawPdbDatabase | RawPrcDatabase
+): TAIBBitmap => {
+    let candidates = extractTAIBBitmapsFromDb(rawDb, 1000);
+
+    if (candidates.length === 0) {
+        for (const record of rawDb.records) {
+            const entries = record.entry as RsrcEntryType;
+            if (entries.type !== "tAIB") continue;
+            candidates = extractAllTAIBBitmapsFromResource(record.data as any);
+            if (candidates.length > 0) break;
+        }
+    }
+
+    if (candidates.length === 0) {
+        dbg("No tAIB resource found in database", rawDb?.header?.name);
+        return placeholderBitmap;
+    }
+
+    candidates.sort((a, b) => scoreBitmapForDefaultPick(b) - scoreBitmapForDefaultPick(a));
+    return candidates[0];
 };
