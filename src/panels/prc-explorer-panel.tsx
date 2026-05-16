@@ -32,6 +32,20 @@ interface ResourceRecord {
     data: Uint8Array | number[] | ArrayBuffer;
 }
 
+function decodeTSTR(data: Uint8Array | number[] | ArrayBuffer): string {
+    const bytes = toUint8Array(data);
+
+    let out = "";
+    for (const byte of bytes) {
+        if (byte === 0x00) break; // common Palm string terminator
+        out += String.fromCharCode(byte);
+    }
+
+    return out;
+}
+
+
+
 export function PrcExplorerPanel({ database: propsDatabase, ...props }: PrcExplorerPanelProps) {
     const [localDatabase, setLocalDatabase] = useState<RawPdbDatabase | RawPrcDatabase | null>(null);
     const [openTypes, setOpenTypes] = useState<Record<string, boolean>>({});
@@ -44,6 +58,11 @@ export function PrcExplorerPanel({ database: propsDatabase, ...props }: PrcExplo
             setOpenTypes({});
         }
     }, [propsDatabase]);
+
+    const selectedTSTRText: string = useMemo(() => {
+        if (!selectedRecord || (selectedRecord.entry.type !== "tSTR" && selectedRecord.entry.type !== "tver")) return "";
+        return decodeTSTR(selectedRecord.data);
+    }, [selectedRecord]);
 
     const handleInspectFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         if (!event.target.files?.[0]) return;
@@ -215,6 +234,26 @@ export function PrcExplorerPanel({ database: propsDatabase, ...props }: PrcExplo
                                                         </Typography>
                                                     )}
                                                 </Stack>
+                                            </Box>
+                                        ) : (selectedRecord.entry.type === "tSTR" || selectedRecord.entry.type === "tver") ? (
+                                            <Box>
+                                                <Typography variant="caption" display="block" gutterBottom color="textSecondary">
+                                                    String Decoder:
+                                                </Typography>
+
+                                                <Paper
+                                                    variant="outlined"
+                                                    sx={{
+                                                        p: 2,
+                                                        bgcolor: "#fafafa",
+                                                        borderRadius: 1,
+                                                        fontFamily: "monospace",
+                                                        whiteSpace: "pre-wrap",
+                                                        wordBreak: "break-word",
+                                                    }}
+                                                >
+                                                    {selectedTSTRText.length > 0 ? selectedTSTRText : "EMPTY STRING"}
+                                                </Paper>
                                             </Box>
                                         ) : (
                                             <Typography variant="body2" color="textSecondary" sx={{ fontStyle: "italic" }}>
