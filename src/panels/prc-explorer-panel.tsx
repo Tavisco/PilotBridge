@@ -47,11 +47,6 @@ interface RectLike {
     h: number;
 }
 
-interface PointLike {
-    x: number;
-    y: number;
-}
-
 // ------------------------------------------------------------
 //  Helper: read a null‑terminated C string from absolute offset
 // ------------------------------------------------------------
@@ -475,7 +470,7 @@ export function PrcExplorerPanel({ database: propsDatabase, ...props }: PrcExplo
     }, [activeDb]);
 
     const selectedBitmaps: TAIBBitmap[] = useMemo(() => {
-        if (!selectedRecord || selectedRecord.entry.type !== "tAIB") return [];
+        if (!selectedRecord || (selectedRecord.entry.type !== "Tbmp" && selectedRecord.entry.type !== "tAIB")) return [];
         return extractAllTAIBBitmapsFromResource(toUint8Array(selectedRecord.data));
     }, [selectedRecord]);
 
@@ -572,7 +567,7 @@ export function PrcExplorerPanel({ database: propsDatabase, ...props }: PrcExplo
                                     <Divider sx={{ my: 1.5 }} />
 
                                     <Box my={2}>
-                                        {selectedRecord.entry.type === "tAIB" ? (
+                                        {(selectedRecord.entry.type === "Tbmp" || selectedRecord.entry.type === "tAIB") ? (
                                             <Box>
                                                 <Typography variant="caption" display="block" gutterBottom color="textSecondary">
                                                     Bitmap Visualizer:
