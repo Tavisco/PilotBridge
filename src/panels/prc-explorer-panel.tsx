@@ -540,8 +540,8 @@ function readHeaderCountCandidates(bytes: Uint8Array): Array<{ offset: number; v
         const be = r.u16be(off);
         const le = r.u16le(off);
 
-        if (be > 0 && be <= 128) out.push({ offset: off, value: be, endian: "be" });
-        if (le > 0 && le <= 128) out.push({ offset: off, value: le, endian: "le" });
+        if (be > 0 && be <= 64) out.push({ offset: off, value: be, endian: "be" });
+        if (le > 0 && le <= 64) out.push({ offset: off, value: le, endian: "le" });
     }
 
     return out;
@@ -602,7 +602,7 @@ function renderObjectLine(
 
         // TITLE
         case 9: {
-            const text = readInlineCString(slice, 0);
+            const text = readInlineCString(slice, 12);
 
             return {
                 line: `TITLE "${escapeQuotedText(text)}"`,
@@ -852,6 +852,9 @@ function parseTfrmCountAndLayout(bytes: Uint8Array): TfrmDebugInfo | null {
                 if (bad || entries.length !== countCand.value) continue;
 
                 const endOfDir = start + countCand.value * fmt.entrySize;
+                if (start === countCand.offset + 2 + 4) {
+                    score += 100;   // very strong signal
+                }
                 const sortedOffsets = [...entries.map((e) => e.offset)].sort((a, b) => a - b);
 
                 if (sortedOffsets.length > 0) {
@@ -906,6 +909,14 @@ function parseTfrmCountAndLayout(bytes: Uint8Array): TfrmDebugInfo | null {
                 if (fmt.entrySize === 4) notes.push("4-byte directory entries");
                 if (fmt.entrySize === 6) notes.push("6-byte directory entries");
                 if (fmt.entrySize === 8) notes.push("8-byte directory entries");
+
+                let zeroEntryCount = 0;
+                for (const e of entries) {
+                    if (e.type === 0 && e.offset === 0) zeroEntryCount++;
+                }
+                if (zeroEntryCount > entries.length / 2) {
+                    score -= 500;   // heavily penalise a directory full of zeros
+                }
 
                 const candidate: TfrmDebugInfo = {
                     resourceId: 0,
