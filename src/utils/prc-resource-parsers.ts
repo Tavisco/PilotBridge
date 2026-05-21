@@ -309,3 +309,35 @@ export function decodeTSTR(data: Uint8Array | number[] | ArrayBuffer): string {
     }
     return out;
 }
+
+// --- tSTL decoder ---
+export function decodeTSTL(data: Uint8Array | number[] | ArrayBuffer): string[] {
+    const bytes = toUint8Array(data);
+    let startIndex = 0;
+
+    // 1. Skip the header bytes
+    // By advancing until we hit a printable ASCII character (>= 32),
+    // we safely bypass the `00 00 07` prefix regardless of exact byte alignment.
+    while (startIndex < bytes.length && bytes[startIndex] < 32) {
+        startIndex++;
+    }
+
+    const strings: string[] = [];
+    let currentStr = "";
+
+    for (let i = startIndex; i < bytes.length; i++) {
+        const byte = bytes[i];
+        if (byte === 0x00) {
+            strings.push(currentStr);
+            currentStr = "";
+        } else {
+            currentStr += String.fromCharCode(byte);
+        }
+    }
+
+    if (currentStr.length > 0) {
+        strings.push(currentStr);
+    }
+
+    return strings;
+}

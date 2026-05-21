@@ -27,7 +27,7 @@ import {
 } from "../utils/taib-extractor";
 import type { ResourceRecord } from "../utils/prc-types";
 import {
-    decodeTFRM,
+    decodeTFRM, decodeTSTL,
     decodeTSTR,
     formatHexView,
 } from "../utils/prc-resource-parsers";
@@ -258,6 +258,13 @@ export function PrcExplorerPanel({
         return decodeTSTR(selectedRecord.data);
     }, [selectedRecord]);
 
+    const selectedTSTL = useMemo(() => {
+        if (!selectedRecord || selectedRecord.entry.type !== "tSTL") {
+            return [""];
+        }
+        return decodeTSTL(selectedRecord.data);
+    }, [selectedRecord]);
+
     const selectedTFRM = useMemo(() => {
         if (!selectedRecord || selectedRecord.entry.type !== "tFRM") return "";
         return decodeTFRM(selectedRecord.data, selectedRecord.entry.resourceId);
@@ -446,6 +453,69 @@ export function PrcExplorerPanel({
                                                     }}
                                                 >
                                                     {selectedTSTR.length > 0 ? selectedTSTR : "EMPTY STRING"}
+                                                </Paper>
+                                            </Box>
+                                        ) : selectedRecord.entry.type === "tSTL"? (
+                                            /* String table decoder */
+                                            <Box>
+                                                <Typography variant="caption" display="block" gutterBottom color="textSecondary">
+                                                    String Table Decoder:
+                                                </Typography>
+                                                <Paper
+                                                    variant="outlined"
+                                                    sx={{
+                                                        bgcolor: "#fafafa",
+                                                        borderRadius: 1,
+                                                        overflow: "hidden",
+                                                    }}
+                                                >
+                                                    {selectedTSTL.length > 0 ? (
+                                                        <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0 }}>
+                                                            {selectedTSTL.map((str, index) => (
+                                                                <Box
+                                                                    component="li"
+                                                                    key={index}
+                                                                    sx={{
+                                                                        display: "flex",
+                                                                        px: 2,
+                                                                        py: 1,
+                                                                        borderBottom: index < selectedTSTL.length - 1 ? "1px solid #e0e0e0" : "none",
+                                                                        fontFamily: "monospace",
+                                                                        "&:hover": { bgcolor: "#f0f0f0" }, // Nice hover effect per row
+                                                                    }}
+                                                                >
+                                                                    <Typography
+                                                                        component="span"
+                                                                        sx={{
+                                                                            fontFamily: "inherit",
+                                                                            color: "text.disabled",
+                                                                            mr: 2,
+                                                                            userSelect: "none",
+                                                                        }}
+                                                                    >
+                                                                        {String(index).padStart(4, "0")}
+                                                                    </Typography>
+                                                                    <Typography
+                                                                        component="span"
+                                                                        sx={{
+                                                                            fontFamily: "inherit",
+                                                                            color: "text.primary",
+                                                                            wordBreak: "break-word",
+                                                                            whiteSpace: "pre-wrap",
+                                                                        }}
+                                                                    >
+                                                                        {str}
+                                                                    </Typography>
+                                                                </Box>
+                                                            ))}
+                                                        </Box>
+                                                    ) : (
+                                                        <Typography
+                                                            sx={{ p: 2, fontFamily: "monospace", color: "text.disabled" }}
+                                                        >
+                                                            EMPTY STRING TABLE
+                                                        </Typography>
+                                                    )}
                                                 </Paper>
                                             </Box>
                                         ) : (
