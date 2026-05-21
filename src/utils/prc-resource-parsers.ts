@@ -341,3 +341,65 @@ export function decodeTSTL(data: Uint8Array | number[] | ArrayBuffer): string[] 
 
     return strings;
 }
+
+// --- Talt (Alert) decoder ---
+export function decodeAlert(data: Uint8Array | number[] | ArrayBuffer, resourceId: string | number = "ID"): string {
+    const bytes = toUint8Array(data);
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+
+    // Parse the 8-byte header
+    const alertTypeVal = view.getUint16(0, false); // false = Big-Endian
+    const helpRscID = view.getUint16(2, false);
+    const numButtons = view.getUint16(4, false);
+    const defaultButton = view.getUint16(6, false);
+
+    // Map the integer to PilRC alert types
+    const alertTypes = ["INFORMATION", "CONFIRMATION", "WARNING", "ERROR"];
+    const alertTypeStr = alertTypes[alertTypeVal] || "INFORMATION";
+
+    let offset = 8;
+
+    // Helper to read null-terminated strings
+    function readString() {
+        let str = "";
+        while (offset < bytes.length && bytes[offset] !== 0x00) {
+            str += String.fromCharCode(bytes[offset]);
+            offset++;
+        }
+        offset++; // Skip the null terminator
+        return str;
+    }
+
+    const title = readString();
+    const message = readString();
+
+    const buttons: string[] = [];
+    for (let i = 0; i < numButtons; i++) {
+        buttons.push(readString());
+    }
+
+    // Reconstruct the PilRC format
+    let pilrc = `ALERT ID ${resourceId}\n`;
+    if (helpRscID !== 0) pilrc += `HELPID ${helpRscID}\n`;
+    pilrc += `DEFAULTBUTTON ${defaultButton}\n`;
+    pilrc += `${alertTypeStr}\n`;
+    pilrc += `BEGIN\n`;
+    pilrc += `    TITLE "${title}"\n`;
+
+    // Escape raw newlines/quotes back into PilRC string literal format
+    const escapedMessage = message
+        .replace(/\n/g, "\\n")
+        .replace(/\r/g, "\\r")
+        .replace(/"/g, '\\"');
+
+    pilrc += `    MESSAGE "${escapedMessage}"\n`;
+
+    if (buttons.length > 0) {
+        const buttonsStr = buttons.map(b => `"${b}"`).join(" ");
+        pilrc += `    BUTTONS ${buttonsStr}\n`;
+    }
+
+    pilrc += `END`;
+
+    return pilrc;
+}
