@@ -100,7 +100,7 @@ const PalmFormVisualizer = ({ pilrcText, renderBitmap }: PalmFormVisualizerProps
                     {form.title && (
                         <Box sx={{
                             position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: '#000080', color: '#fff',
-                            fontSize: '11px', fontWeight: 700, padding: '1px 4px', lineHeight: '12px',
+                            fontSize: '9px', fontWeight: 700, padding: '1px 4px', lineHeight: '12px',
                         }}>
                             {form.title}
                         </Box>
@@ -108,7 +108,7 @@ const PalmFormVisualizer = ({ pilrcText, renderBitmap }: PalmFormVisualizerProps
 
                     {form.labels.map((lbl, i) => (
                         <Box key={`lbl-${i}`} sx={{
-                            position: 'absolute', left: lbl.x, top: lbl.y, fontSize: '10px', fontWeight: 600,
+                            position: 'absolute', left: lbl.x, top: lbl.y, fontSize: '7px', fontWeight: 600,
                             color: '#000', whiteSpace: 'pre-wrap', lineHeight: '11px', letterSpacing: '-0.2px'
                         }}>
                             {lbl.text}
@@ -119,7 +119,7 @@ const PalmFormVisualizer = ({ pilrcText, renderBitmap }: PalmFormVisualizerProps
                         <Box key={`btn-${i}`} sx={{
                             position: 'absolute', left: btn.x, top: btn.y, width: btn.w, height: btn.h,
                             border: '1px solid #000', borderRadius: '4px', backgroundColor: '#cccccc', color: '#000',
-                            fontSize: '10px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                            fontSize: '6px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
                         }}>
                             {btn.text}
                         </Box>
@@ -302,8 +302,7 @@ export const PalmAlertVisualizer = ({ pilrcText }: PalmAlertVisualizerProps) => 
                                 px: 1,
                                 py: '2px',
                                 minWidth: '24px',
-                                textAlign: 'center',
-                                cursor: 'pointer',
+                                textAlign: 'center'
                             }}>
                                 {btn}
                             </Box>
@@ -403,11 +402,9 @@ export const PalmMenuVisualizer = ({ pilrcText }: PalmMenuVisualizerProps) => {
     const menu = useMemo(() => parseMenuResource(pilrcText), [pilrcText]);
 
     const [openIndex, setOpenIndex] = useState<number | null>(null);
-    const [selectedPath, setSelectedPath] = useState<string>("Tap a menu item to inspect it.");
 
     useEffect(() => {
         setOpenIndex(null);
-        setSelectedPath("Tap a menu item to inspect it.");
     }, [pilrcText]);
 
     const titleLayout = useMemo(() => {
@@ -552,12 +549,6 @@ export const PalmMenuVisualizer = ({ pilrcText }: PalmMenuVisualizerProps) => {
                                 return (
                                     <Box
                                         key={`item-${itemIndex}`}
-                                        onClick={() => {
-                                            setSelectedPath(
-                                                `${activePulldown.title} → ${label}${item.id !== undefined ? ` (ID ${item.id})` : ""}${item.command ? `, command ${item.command}` : ""}`
-                                            );
-                                            setOpenIndex(null);
-                                        }}
                                         sx={{
                                             display: "flex",
                                             alignItems: "center",
@@ -596,100 +587,6 @@ export const PalmMenuVisualizer = ({ pilrcText }: PalmMenuVisualizerProps) => {
                         </Box>
                     </Box>
                 )}
-
-                <Box
-                    sx={{
-                        position: "absolute",
-                        left: 2,
-                        right: 2,
-                        top: 18,
-                        bottom: 2,
-                        border: "2px solid #000",
-                        backgroundColor: "#fff",
-                        borderRadius: "4px",
-                        boxSizing: "border-box",
-                        boxShadow: "1px 1px 0px #000",
-                        display: "flex",
-                        flexDirection: "column",
-                        overflow: "hidden",
-                    }}
-                >
-                    <Box sx={{ px: 1, pt: 1, pb: 0.5 }}>
-                        <Typography
-                            sx={{
-                                fontSize: "8px",
-                                fontWeight: 700,
-                                lineHeight: 1.2,
-                                color: "#000",
-                            }}
-                        >
-                            MENU ID {menu.resourceId}
-                        </Typography>
-                        <Typography
-                            sx={{
-                                fontSize: "6px",
-                                lineHeight: 1.2,
-                                color: "#000",
-                                opacity: 0.85,
-                            }}
-                        >
-                            Interactive preview of the PilRC menu bar.
-                        </Typography>
-                    </Box>
-
-                    <Divider sx={{ borderColor: "#000" }} />
-
-                    <Box
-                        sx={{
-                            flex: 1,
-                            px: 1,
-                            py: 0.75,
-                            fontSize: "7px",
-                            lineHeight: "11px",
-                            color: "#000",
-                            overflow: "hidden",
-                        }}
-                    >
-                        {menu.pulldowns.length === 0 ? (
-                            <Box sx={{ opacity: 0.75 }}>Could not decompile this menu resource.</Box>
-                        ) : (
-                            <>
-                                <Box sx={{ mb: 0.75 }}>
-                                    {menu.pulldowns.map((pd, i) => (
-                                        <Box
-                                            key={`summary-${i}`}
-                                            sx={{
-                                                display: "flex",
-                                                justifyContent: "space-between",
-                                                gap: 1,
-                                                py: 0.25,
-                                            }}
-                                        >
-                                            <Box sx={{ fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                                {pd.title}
-                                            </Box>
-                                            <Box sx={{ flexShrink: 0, opacity: 0.8 }}>
-                                                {pd.items.filter((it) => !it.separator).length} items
-                                            </Box>
-                                        </Box>
-                                    ))}
-                                </Box>
-
-                                <Divider sx={{ borderColor: "#000", my: 0.5 }} />
-
-                                <Box
-                                    sx={{
-                                        fontSize: "6px",
-                                        whiteSpace: "pre-wrap",
-                                        wordBreak: "break-word",
-                                    }}
-                                >
-                                    {selectedPath}
-                                </Box>
-                            </>
-                        )}
-                    </Box>
-                </Box>
             </Box>
         </Box>
     );
@@ -1090,6 +987,7 @@ export function PrcExplorerPanel({
                                                                 p: 2, bgcolor: "#fafafa", borderRadius: 1,
                                                                 fontFamily: "monospace", whiteSpace: "pre-wrap",
                                                                 wordBreak: "break-word", maxHeight: 320, overflowY: "auto",
+                                                                fontSize: "10px"
                                                             }}
                                                         >
                                                             {selectedAlert || "Could not decompile this Talt resource."}
@@ -1122,6 +1020,7 @@ export function PrcExplorerPanel({
                                                                 wordBreak: "break-word",
                                                                 maxHeight: 320,
                                                                 overflowY: "auto",
+                                                                fontSize: "9px"
                                                             }}
                                                         >
                                                             {selectedMBAR || "Could not decompile this menu resource."}
