@@ -403,3 +403,189 @@ export function decodeAlert(data: Uint8Array | number[] | ArrayBuffer, resourceI
 
     return pilrc;
 }
+
+// --- MBAR (Menu Bar) decoder ---
+// Based strictly on PilRC's emitted layouts:
+//   RCMENUBAR      -> szRCMENUBAR
+//   RCMENUPULLDOWN -> szRCMENUPULLDOWN
+//   RCMENUITEM     -> szRCMENUITEM
+//
+// PilRC writes resource-relative offsets into the pointer fields, then appends
+// strings after the struct blocks.
+
+type MenuVariant = {
+    name: "68K" | "LE32";
+    littleEndian: boolean;
+    headerNumMenusOffset: number;   // where numMenus lives in the menu bar struct
+    pulldownSize: number;           // exact emitted size of one pull-down struct
+    pulldownCountOffset: number;    // word offset used for hidden/count packing
+    pulldownItemsPtrOffset: number; // pointer to the item table
+};
+
+const MENU_VARIANTS: MenuVariant[] = [
+    // szRCMenuBarBA16 / szRCMenuPullDownBA16
+    {
+        name: "68K",
+        littleEndian: false,
+        headerNumMenusOffset: 26,
+        pulldownSize: 34,
+        pulldownCountOffset: 28,   // packed hidden + numItems
+        pulldownItemsPtrOffset: 30,
+    },
+    // szRCMenuBarBA32 / szRCMenuPullDownBA32
+    {
+        name: "LE32",
+        littleEndian: true,
+        headerNumMenusOffset: 22,
+        pulldownSize: 36,
+        pulldownCountOffset: 28,   // hidden bitword
+        pulldownItemsPtrOffset: 32,
+    },
+];
+
+export function decodeMBAR(
+    data: Uint8Array | number[] | ArrayBuffer,
+    resourceId: string | number = "ID",
+): string {
+    const bytes = toUint8Array(data);
+
+    if (bytes.length < 32) {
+        return `// Invalid MBAR resource: Too small`;
+    }
+
+    const best = tryDecodeWithAnyVariant(bytes, resourceId);
+    console.log(best);
+    if (best) return best;
+
+    return `// Invalid MBAR resource: Unable to decode with PilRC layouts`;
+}
+
+function tryDecodeWithAnyVariant(bytes: Uint8Array, resourceId: string | number): string | null {
+    let bestText: string | null = null;
+    let bestScore = -Infinity;
+
+    for (const variant of MENU_VARIANTS) {
+        const result = tryDecodeVariant(bytes, resourceId, variant);
+        if (result && result.score > bestScore) {
+            bestScore = result.score;
+            bestText = result.text;
+        }
+    }
+
+    return bestText;
+}
+
+function tryDecodeVariant(
+    bytes: Uint8Array,
+    resourceId: string | number,
+    variant: MenuVariant,
+): { text: string; score: number } | null {
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+
+    const numMenus = readU16(view, variant.headerNumMenusOffset, variant.littleEndian);
+    if (numMenus > 32) return null; // PilRC's impdMax is 32
+    if (numMenus === 0) {
+        return {
+            text: `MENU ID ${resourceId}\nBEGIN\nEND`,
+            score: 1,
+        };
+    }
+
+    const pulldownsStart = 32; // exact emitted size of szRCMENUBAR
+    const pulldownsEnd = pulldownsStart + (numMenus * variant.pulldownSize);
+    if (pulldownsEnd > bytes.length) return null;
+
+    const menus: string[] = [];
+    let score = 0;
+
+    // First pass: read pulldowns and all menu items by following the emitted offsets.
+    for (let i = 0; i < numMenus; i++) {
+        const pdOffset = pulldownsStart + (i * variant.pulldownSize);
+        if (pdOffset + variant.pulldownSize > bytes.length) return null;
+
+        const titlePtr = readU32(view, pdOffset + 24, variant.littleEndian);
+        const title = readCString(bytes, titlePtr);
+        if (!title) return null;
+
+        const packedCount = readU16(view, pdOffset + variant.pulldownCountOffset, variant.littleEndian);
+
+        let numItems: number;
+        if (variant.name === "68K") {
+            // szRCMenuPullDownBA16: hidden bit + 15-bit numItems in one word
+            numItems = packedCount & 0x7fff;
+        } else {
+            // szRCMenuPullDownBA32: hidden word at +28, numItems word at +30
+            numItems = readU16(view, pdOffset + 30, variant.littleEndian);
+        }
+
+        if (numItems > 128) return null; // PilRC's imiMax is 128
+        const itemsPtr = readU32(view, pdOffset + variant.pulldownItemsPtrOffset, variant.littleEndian);
+        if (itemsPtr >= bytes.length) return null;
+
+        const items: string[] = [];
+        for (let j = 0; j < numItems; j++) {
+            const itemOffset = itemsPtr + (j * 8); // szRCMENUITEM is always 8 bytes
+            if (itemOffset + 8 > bytes.length) return null;
+
+            const id = readU16(view, itemOffset + 0, variant.littleEndian);
+            const command = bytes[itemOffset + 2];
+            const strPtr = readU32(view, itemOffset + 4, variant.littleEndian);
+            const text = readCString(bytes, strPtr);
+
+            if (!text) return null;
+
+            if (text === "-") {
+                items.push(`\t\tMENUITEM SEPARATOR`);
+            } else {
+                let line = `\t\tMENUITEM "${escapePilrcText(text)}" ID ${id}`;
+                if (command !== 0) {
+                    line += ` "${escapePilrcCommand(command)}"`;
+                }
+                items.push(line);
+            }
+            score += 1;
+        }
+
+        menus.push(`\tPULLDOWN "${escapePilrcText(title)}"\n\tBEGIN\n${items.join("\n")}\n\tEND`);
+        score += title.length;
+    }
+
+    const text = `MENU ID ${resourceId}\nBEGIN\n${menus.join("\n")}\nEND`;
+    score += numMenus * 4;
+    return { text, score };
+}
+
+function readU16(view: DataView, offset: number, littleEndian: boolean): number {
+    if (offset < 0 || offset + 2 > view.byteLength) return 0;
+    return view.getUint16(offset, littleEndian);
+}
+
+function readU32(view: DataView, offset: number, littleEndian: boolean): number {
+    if (offset < 0 || offset + 4 > view.byteLength) return 0;
+    return view.getUint32(offset, littleEndian);
+}
+
+function readCString(bytes: Uint8Array, offset: number): string {
+    if (offset < 0 || offset >= bytes.length) return "";
+
+    let out = "";
+    for (let i = offset; i < bytes.length; i++) {
+        const b = bytes[i];
+        if (b === 0x00) break;
+        out += String.fromCharCode(b);
+    }
+    return out;
+}
+
+function escapePilrcText(text: string): string {
+    return text
+        .replaceAll("\\", "\\\\")
+        .replaceAll('"', '\\"');
+}
+
+function escapePilrcCommand(cmd: number): string {
+    const ch = String.fromCharCode(cmd);
+    return ch
+        .replaceAll("\\", "\\\\")
+        .replaceAll('"', '\\"');
+}
