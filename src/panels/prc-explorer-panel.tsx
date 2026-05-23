@@ -795,26 +795,17 @@ export const PalmFormVisualizer = ({ pilrcText, renderBitmap, fontImage }: PalmF
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
 
-        // Keep pixel‑perfect rendering
         ctx.imageSmoothingEnabled = false;
 
-        // Async drawing function
         const render = async () => {
-            // Load the font once (cached)
             const font = await loadPalmOSFont();
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Helper – measure text width using the loaded font
-            const measureTextWidth = (text: string, scale: number) => {
-                let w = 0;
-                for (const ch of text) {
-                    const glyph = resolveGlyph(font, ch);
-                    if (glyph) w += getAdvanceWidth(glyph, scale);
-                }
-                return w;
+            const measureTextWidth = async (text: string, scale: number) => {
+                const { width } = await measurePalmOSText(text, { scale });
+                return width;
             };
 
-            // Bitmap text blitter – draws at given top‑left (x, y), not baseline
             const drawBitmapText = async (
                 text: string,
                 x: number,
@@ -824,7 +815,6 @@ export const PalmFormVisualizer = ({ pilrcText, renderBitmap, fontImage }: PalmF
             ) => {
                 const scale = 1;
                 const color = invert ? "#fff" : "#000";
-                // Convert “top of cell” (y) to baseline using the font's ascent
                 const baselineY = y + font.ascent * scale;
                 await drawPalmOSText(ctx, text, x, baselineY, { color, scale });
             };
@@ -832,12 +822,6 @@ export const PalmFormVisualizer = ({ pilrcText, renderBitmap, fontImage }: PalmF
             // --- Form background ---
             ctx.fillStyle = "#fff";
             ctx.fillRect(formBounds.x, formBounds.y, formBounds.w, formBounds.h);
-
-            if (form.header.modal) {
-                ctx.strokeStyle = "#000";
-                ctx.lineWidth = 2;
-                ctx.strokeRect(formBounds.x, formBounds.y, formBounds.w, formBounds.h);
-            }
 
             const drawDottedLine = (x: number, y: number, w: number) => {
                 ctx.beginPath();
@@ -858,48 +842,48 @@ export const PalmFormVisualizer = ({ pilrcText, renderBitmap, fontImage }: PalmF
                 ctx.fillRect(x + w - 1, y + 1, 1, h - 2);
             };
 
-            // --- Draw widgets (now with awaited text) ---
+            if (form.header.modal) {
+                ctx.strokeStyle = "#00007f";
+                ctx.lineWidth = 2;
+                // drawButtonRect(formBounds.x - 1, formBounds.y - 1, formBounds.w + 2, formBounds.h + 2)
+                ctx.strokeRect(formBounds.x - 1, formBounds.y - 1, formBounds.w + 2, formBounds.h + 2);
+            }
+
+            // --- Draw shapes & text (no bitmaps – they are handled in React) ---
             for (const w of form.widgets) {
                 const xOffset = formBounds.x;
                 const yOffset = formBounds.y;
 
                 switch (w.kind) {
-                    case "title":
-                        ctx.fillStyle = "#000";
+                    case "title": {
+                        ctx.fillStyle = "#00007f";
                         ctx.fillRect(xOffset, yOffset, formBounds.w, 12);
-                        // Title bar: inverted text
-                        await drawBitmapText(w.text, xOffset + 3, yOffset + 1, true, true);
-                        break;
 
-                    case "label": {
-                        const text = w.text.replace(/\r/g, "\n");
-                        const isBold = w.font === 1 || w.font === 3;
+                        const titleText = w.text.replace(/\r/g, "\n");
+                        const scale = 1;
+                        const textWidth = await measureTextWidth(titleText, scale);
+                        const textHeight = font.lineHeight * scale; // 11px
 
-                        const textWidth = measureTextWidth(text, 2);
-                        const width = textWidth + (isBold ? text.length : 0); // bold adds ~1px per char
+                        // Center horizontally in the title bar
+                        const textX = Math.round(xOffset + (formBounds.w - textWidth) / 2);
+                        // Center vertically within the 12px bar
+                        const textTopY = Math.round(yOffset + (12 - textHeight) / 2);
 
-                        const labelX = resolveCoord(w.at.x, width, formBounds.w, width);
-                        const labelY = resolveCoord(w.at.y, 11 + 2, formBounds.h, 11 + 2); // cell height ~13
-
-                        await drawBitmapText(text, xOffset + labelX, yOffset + labelY, isBold);
+                        await drawBitmapText(titleText, textX, textTopY, true, true);
                         break;
                     }
 
-                    case "bitmap": {
-                        const bitX = xOffset + w.at.x;
-                        const bitY = yOffset + w.at.y;
-                        const imageSource = renderBitmap ? renderBitmap(w.id) : null;
+                    case "label": {
+                        const rawText = w.text.replace(/\r/g, "\n");
+                        const isBold = w.font === 1 || w.font === 3;
+                        const scale = 1;
+                        const textWidth = await measureTextWidth(rawText, scale);
+                        const width = textWidth + (isBold ? rawText.length : 0);
 
-                        if (imageSource instanceof HTMLImageElement && imageSource.complete) {
-                            ctx.drawImage(imageSource, bitX, bitY);
-                        } else {
-                            ctx.fillStyle = "#f5f5f5";
-                            ctx.fillRect(bitX, bitY, 18, 18);
-                            ctx.strokeStyle = "#000";
-                            ctx.setLineDash([2, 2]);
-                            ctx.strokeRect(bitX, bitY, 18, 18);
-                            ctx.setLineDash([]);
-                        }
+                        const labelX = resolveCoord(w.at.x, width, formBounds.w, width);
+                        const labelY = resolveCoord(w.at.y, 11 + 2, formBounds.h, 11 + 2);
+
+                        await drawBitmapText(rawText, xOffset + labelX, yOffset + labelY, isBold);
                         break;
                     }
 
@@ -907,6 +891,34 @@ export const PalmFormVisualizer = ({ pilrcText, renderBitmap, fontImage }: PalmF
                         ctx.fillStyle = "#000";
                         ctx.fillRect(xOffset + w.rect.x, yOffset + w.rect.y, Math.max(1, w.rect.w), 1);
                         break;
+
+                    case "field": {
+                        // Assuming fields have an x, y, and w property
+                        const fw = w.rect?.w || w.rect?.w || 50;
+                        drawDottedLine(xOffset + w.rect?.x, yOffset + w.rect?.y + 11, fw);
+                        break;
+                    }
+
+                    case "button": {
+                        const bx = xOffset + w.rect?.x;
+                        const by = yOffset + w.rect?.y;
+                        const bw = w.rect?.w || 30;
+                        const bh = w.rect?.h || 12;
+
+                        drawButtonRect(bx, by, bw, bh);
+
+                        const rawText = w.text.replace(/\r/g, "\n");
+                        const scale = 1;
+                        const textWidth = await measureTextWidth(rawText, scale);
+                        const textHeight = font.lineHeight * scale; // 11px
+
+                        // Center and round to integer pixels to avoid sub‑pixel blur
+                        const textX = Math.round(bx + (bw - textWidth) / 2);
+                        const textTopY = Math.round(by + (bh - textHeight) / 2);
+
+                        await drawBitmapText(rawText, textX, textTopY, false);
+                        break;
+                    }
 
                     case "frame":
                     case "rectangle":
@@ -928,6 +940,7 @@ export const PalmFormVisualizer = ({ pilrcText, renderBitmap, fontImage }: PalmF
                         ctx.strokeRect(xOffset + w.rect.x, yOffset + w.rect.y, w.rect.w, w.rect.h);
                         ctx.setLineDash([]);
                         break;
+
                 }
             }
         };
@@ -971,10 +984,39 @@ export const PalmFormVisualizer = ({ pilrcText, renderBitmap, fontImage }: PalmF
                         imageRendering: "pixelated",
                     }}
                 />
+
+                {/* Overlay for bitmaps – uses the same coordinate system as the canvas */}
+                <Box
+                    position="absolute"
+                    top={0}
+                    left={0}
+                    width="100%"
+                    height="100%"
+                    sx={{ pointerEvents: "none" }}
+                >
+                    {form.widgets
+                        .filter((w) => w.kind === "bitmap")
+                        .map((w) => {
+                            const bitX = w.at.x + formBounds.x;
+                            const bitY = w.at.y + formBounds.y;
+                            return (
+                                <Box
+                                    key={`bitmap-${w.id}-${bitX}-${bitY}`}
+                                    position="absolute"
+                                    left={bitX}
+                                    top={bitY}
+                                >
+                                    {renderBitmap ? renderBitmap(w.id) : null}
+                                </Box>
+                            );
+                        })}
+                </Box>
             </Box>
         </Box>
     );
 };
+
+
 interface PalmAlertVisualizerProps {
     pilrcText: string;
 }
