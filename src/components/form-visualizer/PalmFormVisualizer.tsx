@@ -1,11 +1,12 @@
-import { useMemo, useEffect, useRef} from "react";
+import {useMemo, useEffect, useRef} from "react";
 import {
-    Box,
+    Box, Paper,
 
 } from "@mui/material";
 
 import {loadPalmOSFont, PalmFont, PalmGlyph} from "../../utils/yaff-font.ts";
 import {AtToken, parseFormHeader, parseWidgets} from "../../utils/pilrc-parser.ts";
+import Grid2 from "@mui/material/Grid2";
 
 export interface PalmFormVisualizerProps {
     pilrcText: string;
@@ -136,16 +137,16 @@ export async function measurePalmOSText(
     }
 
     const height = lines.length * (font.lineHeight + lineGap) * scale;
-    return { width: maxWidth, height };
+    return {width: maxWidth, height};
 }
 
-export const PalmFormVisualizer = ({ pilrcText, renderBitmap, fontImage }: PalmFormVisualizerProps) => {
+export const PalmFormVisualizer = ({pilrcText, renderBitmap, fontImage}: PalmFormVisualizerProps) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     const form = useMemo(() => {
         const header = parseFormHeader(pilrcText);
         const widgets = parseWidgets(pilrcText, header);
-        return { header, widgets };
+        return {header, widgets};
     }, [pilrcText]);
 
     const outerW = 320;
@@ -165,7 +166,7 @@ export const PalmFormVisualizer = ({ pilrcText, renderBitmap, fontImage }: PalmF
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             const measureTextWidth = async (text: string, scale: number) => {
-                const { width } = await measurePalmOSText(text, { scale });
+                const {width} = await measurePalmOSText(text, {scale});
                 return width;
             };
 
@@ -179,7 +180,7 @@ export const PalmFormVisualizer = ({ pilrcText, renderBitmap, fontImage }: PalmF
                 const scale = 1;
                 const color = invert ? "#fff" : "#000";
                 const baselineY = y + font.ascent * scale;
-                await drawPalmOSText(ctx, text, x, baselineY, { color, scale });
+                await drawPalmOSText(ctx, text, x, baselineY, {color, scale});
             };
 
             // --- Form background ---
@@ -312,71 +313,94 @@ export const PalmFormVisualizer = ({ pilrcText, renderBitmap, fontImage }: PalmF
     }, [form, renderBitmap, fontImage, formBounds]);
 
     return (
-        <Box
-            sx={{
-        width: outerW,
-            height: outerH,
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            bgcolor: "#e0e0e0",
-            borderRadius: 1,
-    }}
->
-    <Box
-        sx={{
-        width: 160,
-            height: 160,
-            position: "relative",
-            transform: "scale(2)",
-            transformOrigin: "center center",
-            boxShadow: "0px 4px 12px rgba(0,0,0,0.15)",
-            backgroundImage: "radial-gradient(#d3d3d3 1px, transparent 1px)",
-            backgroundSize: "4px 4px",
-            bgcolor: "#fff",
-    }}
->
-    <canvas
-        ref={canvasRef}
-    width={160}
-    height={160}
-    style={{
-        display: "block",
-            width: "100%",
-            height: "100%",
-            imageRendering: "pixelated",
-    }}
-    />
-
-    {/* Overlay for bitmaps – uses the same coordinate system as the canvas */}
-    <Box
-        position="absolute"
-    top={0}
-    left={0}
-    width="100%"
-    height="100%"
-    sx={{ pointerEvents: "none" }}
->
-    {form.widgets
-        .filter((w) => w.kind === "bitmap")
-        .map((w) => {
-            const bitX = w.at.x + formBounds.x;
-            const bitY = w.at.y + formBounds.y;
-            // @ts-ignore
-            // @ts-ignore
-            return (
-                <Box
-                    key={`bitmap-${w.id}-${bitX}-${bitY}`}
-            position="absolute"
-            left={bitX}
-            top={bitY}
+        <Grid2 container spacing={2}>
+            <Grid2 size={{ xs: 12, md: 6 }}>
+                <Paper
+                    variant="outlined"
+                    sx={{
+                        p: 2,
+                        bgcolor: "#fafafa",
+                        borderRadius: 1,
+                        fontFamily: "monospace",
+                        whiteSpace: "pre-wrap",
+                        wordBreak: "break-word",
+                        maxHeight: 320,
+                        overflowY: "auto",
+                        fontSize: "7px",
+                    }}
                 >
-                {renderBitmap ? renderBitmap(w.id) : null}
-                </Box>
-        );
-        })}
-    </Box>
-    </Box>
-    </Box>
-);
+                    {pilrcText || "Could not decompile this tFRM resource."}
+                </Paper>
+            </Grid2>
+
+            <Grid2 size={{ xs: 12, md: 6 }}>
+                {pilrcText && (
+                    <Box
+                        sx={{
+                            width: outerW,
+                            height: outerH,
+                            display: "flex",
+                            justifyContent: "center",
+                            alignItems: "center",
+                            bgcolor: "#e0e0e0",
+                            borderRadius: 1,
+                        }}
+                    >
+                        <Box
+                            sx={{
+                                width: 160,
+                                height: 160,
+                                position: "relative",
+                                transform: "scale(2)",
+                                transformOrigin: "center center",
+                                boxShadow: "0px 4px 12px rgba(0,0,0,0.15)",
+                                backgroundImage: "radial-gradient(#d3d3d3 1px, transparent 1px)",
+                                backgroundSize: "4px 4px",
+                                bgcolor: "#fff",
+                            }}
+                        >
+                            <canvas
+                                ref={canvasRef}
+                                width={160}
+                                height={160}
+                                style={{
+                                    display: "block",
+                                    width: "100%",
+                                    height: "100%",
+                                    imageRendering: "pixelated",
+                                }}
+                            />
+
+                            <Box
+                                position="absolute"
+                                top={0}
+                                left={0}
+                                width="100%"
+                                height="100%"
+                                sx={{ pointerEvents: "none" }}
+                            >
+                                {form.widgets
+                                    .filter((w) => w.kind === "bitmap")
+                                    .map((w) => {
+                                        const bitX = w.at.x + formBounds.x;
+                                        const bitY = w.at.y + formBounds.y;
+
+                                        return (
+                                            <Box
+                                                key={`bitmap-${w.id}-${bitX}-${bitY}`}
+                                                position="absolute"
+                                                left={bitX}
+                                                top={bitY}
+                                            >
+                                                {renderBitmap ? renderBitmap(w.id) : null}
+                                            </Box>
+                                        );
+                                    })}
+                            </Box>
+                        </Box>
+                    </Box>
+                )}
+            </Grid2>
+        </Grid2>
+    );
 };

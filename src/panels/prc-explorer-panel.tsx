@@ -17,14 +17,14 @@ import ExpandMore from "@mui/icons-material/ExpandMore";
 import FolderIcon from "@mui/icons-material/Folder";
 import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
 import FileUploadIcon from "@mui/icons-material/FileUpload";
-import { DatabaseHdrType, RawPdbDatabase, RawPrcDatabase } from "palm-pdb";
-import { Panel } from "../panel";
-import { PalmIcon } from "../components/PalmIcon";
+import {DatabaseHdrType, RawPdbDatabase, RawPrcDatabase} from "palm-pdb";
+import {Panel} from "../panel";
+import {PalmIcon} from "../components/PalmIcon";
 import {
     extractAllTAIBBitmapsFromResource,
     toUint8Array,
 } from "../utils/taib-extractor";
-import type { ResourceRecord } from "../utils/prc-types";
+import type {ResourceRecord} from "../utils/prc-types";
 import {
     decodeAlert, decodeMBAR,
     decodeTFRM, decodeTSTL,
@@ -35,12 +35,14 @@ import {PalmFormVisualizer} from "../components/form-visualizer/PalmFormVisualiz
 import {PalmMenuVisualizer} from "../components/form-visualizer/PalmMenuVisualizer.tsx";
 import {PalmAlertVisualizer} from "../components/form-visualizer/PalmAlertVisualizer.tsx";
 import PalmBitmapVisualizer from "../components/form-visualizer/PalmBitmapVisualizer.tsx";
+import {PalmStringVisualizer} from "../components/form-visualizer/PalmStringVisualizer.tsx";
 
 export interface PrcExplorerPanelProps {
     /** Database to inspect (embedding case). If omitted, only upload is available. */
     database?: RawPdbDatabase | RawPrcDatabase | null;
     /** Show the local file upload button. Default true. */
     enableFileUpload?: boolean;
+
     [key: string]: unknown;
 }
 
@@ -82,14 +84,14 @@ export function PrcExplorerPanel({
         // Forms usually use the first bitmap variant
         const targetBmp = decodedBitmaps
             .filter((x) => x.density == 72)
-            .sort((a,b)=> a < b ? 1:-1)
+            .sort((a, b) => a < b ? 1 : -1)
             .at(0);
 
         if (!targetBmp) {
             return null;
         }
 
-        return <PalmIcon bitmap={targetBmp} scale={1} />;
+        return <PalmIcon bitmap={targetBmp} scale={1}/>;
     };
 
     // --- file upload (only used when enableFileUpload is true) ---
@@ -181,7 +183,7 @@ export function PrcExplorerPanel({
     const selectedBytes = selectedRecord ? toUint8Array(selectedRecord.data) : new Uint8Array();
 
     const toggleTypeOpen = (type: string) =>
-        setOpenTypes((prev) => ({ ...prev, [type]: !prev[type] }));
+        setOpenTypes((prev) => ({...prev, [type]: !prev[type]}));
 
     return (
         <Panel
@@ -192,7 +194,7 @@ export function PrcExplorerPanel({
             }
             isExpandedByDefault
             {...panelProps}
-            sx={{ width: "100%", ...((panelProps as any)?.sx ?? {}) }}
+            sx={{width: "100%", ...((panelProps as any)?.sx ?? {})}}
         >
             <Box>
                 <Box p={2} display="flex" justifyContent="space-between" alignItems="center">
@@ -202,7 +204,7 @@ export function PrcExplorerPanel({
                             : "Select an app below or open a local file directly to inspect."}
                     </Typography>
                     {enableFileUpload && (
-                        <Button variant="outlined" component="label" startIcon={<FileUploadIcon />}>
+                        <Button variant="outlined" component="label" startIcon={<FileUploadIcon/>}>
                             OPEN FILE TO INSPECT
                             <input
                                 type="file"
@@ -221,27 +223,33 @@ export function PrcExplorerPanel({
                         </Typography>
                     </Box>
                 ) : (
-                    <Grid2 container spacing={0} sx={{ border: "1px solid #ccc", minHeight: 400, m: 2, borderRadius: 1 }}>
+                    <Grid2 container spacing={0} sx={{border: "1px solid #ccc", minHeight: 400, m: 2, borderRadius: 1}}>
                         {/* Left sidebar: resource tree */}
                         <Grid2
-                            size={{ xs: 12, sm: 4 }}
-                            sx={{ borderRight: "1px solid #ccc", maxHeight: 500, overflowY: "auto", bgcolor: "#f9f9f9" }}
+                            size={{xs: 12, sm: 4}}
+                            sx={{borderRight: "1px solid #ccc", maxHeight: 500, overflowY: "auto", bgcolor: "#f9f9f9"}}
                         >
                             <List dense component="nav">
                                 {Object.entries(groupedResources).map(([type, records]) => {
                                     const isExpanded = !!openTypes[type];
                                     return (
                                         <Box key={type}>
-                                            <ListItemButton onClick={() => toggleTypeOpen(type)} sx={{ py: 0.5 }}>
-                                                <FolderIcon fontSize="small" sx={{ mr: 1, color: "#e0a910" }} />
+                                            <ListItemButton onClick={() => toggleTypeOpen(type)} sx={{py: 0.5}}>
+                                                <FolderIcon fontSize="small" sx={{mr: 1, color: "#e0a910"}}/>
                                                 <ListItemText
                                                     primary={`${type} (${records.length})`}
-                                                    primaryTypographyProps={{ style: { fontFamily: "monospace", fontWeight: 600 } }}
+                                                    primaryTypographyProps={{
+                                                        style: {
+                                                            fontFamily: "monospace",
+                                                            fontWeight: 600
+                                                        }
+                                                    }}
                                                 />
-                                                {isExpanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
+                                                {isExpanded ? <ExpandLess fontSize="small"/> :
+                                                    <ExpandMore fontSize="small"/>}
                                             </ListItemButton>
                                             <Collapse in={isExpanded} timeout="auto" unmountOnExit>
-                                                <List dense component="div" disablePadding sx={{ pl: 3 }}>
+                                                <List dense component="div" disablePadding sx={{pl: 3}}>
                                                     {records.map((rec) => {
                                                         const isSelected = selectedRecord === rec;
                                                         const resIdHex = `0x${rec.entry.resourceId.toString(16).padStart(4, "0")}`;
@@ -250,12 +258,13 @@ export function PrcExplorerPanel({
                                                                 key={`${type}-${rec.entry.resourceId}`}
                                                                 selected={isSelected}
                                                                 onClick={() => setSelectedRecord(rec)}
-                                                                sx={{ py: 0.2 }}
+                                                                sx={{py: 0.2}}
                                                             >
-                                                                <InsertDriveFileIcon fontSize="small" sx={{ mr: 1, color: "#757575" }} />
+                                                                <InsertDriveFileIcon fontSize="small"
+                                                                                     sx={{mr: 1, color: "#757575"}}/>
                                                                 <ListItemText
                                                                     primary={`${rec.entry.resourceId} (${resIdHex})`}
-                                                                    primaryTypographyProps={{ style: { fontFamily: "monospace" } }}
+                                                                    primaryTypographyProps={{style: {fontFamily: "monospace"}}}
                                                                 />
                                                             </ListItemButton>
                                                         );
@@ -270,81 +279,67 @@ export function PrcExplorerPanel({
 
                         {/* Right detail pane */}
                         <Grid2
-                            size={{ xs: 12, sm: 8 }}
-                            sx={{ p: 2, maxHeight: 500, overflowY: "auto", display: "flex", flexDirection: "column", bgcolor: "#fff" }}
+                            size={{xs: 12, sm: 8}}
+                            sx={{
+                                p: 2,
+                                maxHeight: 500,
+                                overflowY: "auto",
+                                display: "flex",
+                                flexDirection: "column",
+                                bgcolor: "#fff"
+                            }}
                         >
                             {selectedRecord ? (
                                 <Box>
-                                    <Typography variant="subtitle2" color="textSecondary" sx={{ fontFamily: "monospace" }}>
-                                        Type: <strong>{selectedRecord.entry.type}</strong> | ID: <strong>{selectedRecord.entry.resourceId}</strong>
+                                    <Typography variant="subtitle2" color="textSecondary"
+                                                sx={{fontFamily: "monospace"}}>
+                                        Type: <strong>{selectedRecord.entry.type}</strong> |
+                                        ID: <strong>{selectedRecord.entry.resourceId}</strong>
                                     </Typography>
-                                    <Typography variant="body2" color="textSecondary" sx={{ fontFamily: "monospace", mb: 1 }}>
+                                    <Typography variant="body2" color="textSecondary"
+                                                sx={{fontFamily: "monospace", mb: 1}}>
                                         Resource Size: {selectedBytes.length} bytes
                                         {selectedRecord.entry.localChunkId !== undefined &&
                                             ` | Chunk Offset: 0x${selectedRecord.entry.localChunkId.toString(16).toUpperCase()}`}
                                     </Typography>
 
-                                    <Divider sx={{ my: 1.5 }} />
+                                    <Divider sx={{my: 1.5}}/>
 
                                     <Box my={2}>
                                         {/* Bitmap visualizer */}
                                         {(selectedRecord.entry.type === "Tbmp" || selectedRecord.entry.type === "tAIB") ? (
                                             <Box>
-                                                <Typography variant="caption" display="block" gutterBottom color="textSecondary">
+                                                <Typography variant="caption" display="block" gutterBottom
+                                                            color="textSecondary">
                                                     Bitmap Visualizer:
                                                 </Typography>
-                                                <PalmBitmapVisualizer bitmaps={selectedBitmaps} />
+                                                <PalmBitmapVisualizer bitmaps={selectedBitmaps}/>
                                             </Box>
                                         ) : selectedRecord.entry.type === "tFRM" ? (
-                                            /* MODIFIED: Embedded Visualizer into the tFRM section */
                                             <Box>
-                                                <Typography variant="caption" display="block" gutterBottom color="textSecondary">
+                                                <Typography variant="caption" display="block" gutterBottom
+                                                            color="textSecondary">
                                                     Form Decompiler & Visualizer:
                                                 </Typography>
-                                                <Grid2 container spacing={2}>
-                                                    <Grid2 size={{ xs: 12, md: 6 }}>
-                                                        <Paper
-                                                            variant="outlined"
-                                                            sx={{
-                                                                p: 2, bgcolor: "#fafafa", borderRadius: 1,
-                                                                fontFamily: "monospace", whiteSpace: "pre-wrap",
-                                                                wordBreak: "break-word", maxHeight: 320, overflowY: "auto",
-                                                                fontSize: "7px"
-                                                            }}
-                                                        >
-                                                            {selectedTFRM || "Could not decompile this tFRM resource."}
-                                                        </Paper>
-                                                    </Grid2>
-                                                    <Grid2 size={{ xs: 12, md: 6 }}>
-                                                        {selectedTFRM && (
-                                                            <PalmFormVisualizer
-                                                                pilrcText={selectedTFRM}
-                                                                renderBitmap={handleRenderFormBitmap}
-                                                            />
-                                                        )}
-                                                    </Grid2>
-                                                </Grid2>
+                                                <PalmFormVisualizer
+                                                    pilrcText={selectedTFRM}
+                                                    renderBitmap={handleRenderFormBitmap}
+                                                />
                                             </Box>
                                         ) : selectedRecord.entry.type === "tSTR" || selectedRecord.entry.type === "tver" ? (
                                             /* String decoder */
                                             <Box>
-                                                <Typography variant="caption" display="block" gutterBottom color="textSecondary">
+                                                <Typography variant="caption" display="block" gutterBottom
+                                                            color="textSecondary">
                                                     String Decoder:
                                                 </Typography>
-                                                <Paper
-                                                    variant="outlined"
-                                                    sx={{
-                                                        p: 2, bgcolor: "#fafafa", borderRadius: 1,
-                                                        fontFamily: "monospace", whiteSpace: "pre-wrap", wordBreak: "break-word",
-                                                    }}
-                                                >
-                                                    {selectedTSTR.length > 0 ? selectedTSTR : "EMPTY STRING"}
-                                                </Paper>
+                                                <PalmStringVisualizer selectedTSTR={selectedTSTR} />
                                             </Box>
-                                        ) : selectedRecord.entry.type === "tSTL"? (
+                                        ) : selectedRecord.entry.type === "tSTL" ? (
                                             /* String table decoder */
                                             <Box>
-                                                <Typography variant="caption" display="block" gutterBottom color="textSecondary">
+                                                <Typography variant="caption" display="block" gutterBottom
+                                                            color="textSecondary">
                                                     String Table Decoder:
                                                 </Typography>
                                                 <Paper
@@ -356,7 +351,7 @@ export function PrcExplorerPanel({
                                                     }}
                                                 >
                                                     {selectedTSTL.length > 0 ? (
-                                                        <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0 }}>
+                                                        <Box component="ul" sx={{listStyle: "none", m: 0, p: 0}}>
                                                             {selectedTSTL.map((str, index) => (
                                                                 <Box
                                                                     component="li"
@@ -367,7 +362,7 @@ export function PrcExplorerPanel({
                                                                         py: 1,
                                                                         borderBottom: index < selectedTSTL.length - 1 ? "1px solid #e0e0e0" : "none",
                                                                         fontFamily: "monospace",
-                                                                        "&:hover": { bgcolor: "#f0f0f0" }, // Nice hover effect per row
+                                                                        "&:hover": {bgcolor: "#f0f0f0"}, // Nice hover effect per row
                                                                     }}
                                                                 >
                                                                     <Typography
@@ -397,7 +392,7 @@ export function PrcExplorerPanel({
                                                         </Box>
                                                     ) : (
                                                         <Typography
-                                                            sx={{ p: 2, fontFamily: "monospace", color: "text.disabled" }}
+                                                            sx={{p: 2, fontFamily: "monospace", color: "text.disabled"}}
                                                         >
                                                             EMPTY STRING TABLE
                                                         </Typography>
@@ -407,24 +402,30 @@ export function PrcExplorerPanel({
                                         ) : selectedRecord.entry.type === "Talt" ? (
                                             /* Alert resource decoder */
                                             <Box>
-                                                <Typography variant="caption" display="block" gutterBottom color="textSecondary">
+                                                <Typography variant="caption" display="block" gutterBottom
+                                                            color="textSecondary">
                                                     PilRC Alert Decoder:
                                                 </Typography>
                                                 <Grid2 container spacing={2}>
-                                                    <Grid2 size={{ xs: 12, md: 6 }}>
+                                                    <Grid2 size={{xs: 12, md: 6}}>
                                                         <Paper
                                                             variant="outlined"
                                                             sx={{
-                                                                p: 2, bgcolor: "#fafafa", borderRadius: 1,
-                                                                fontFamily: "monospace", whiteSpace: "pre-wrap",
-                                                                wordBreak: "break-word", maxHeight: 320, overflowY: "auto",
+                                                                p: 2,
+                                                                bgcolor: "#fafafa",
+                                                                borderRadius: 1,
+                                                                fontFamily: "monospace",
+                                                                whiteSpace: "pre-wrap",
+                                                                wordBreak: "break-word",
+                                                                maxHeight: 320,
+                                                                overflowY: "auto",
                                                                 fontSize: "10px"
                                                             }}
                                                         >
                                                             {selectedAlert || "Could not decompile this Talt resource."}
                                                         </Paper>
                                                     </Grid2>
-                                                    <Grid2 size={{ xs: 12, md: 6 }}>
+                                                    <Grid2 size={{xs: 12, md: 6}}>
                                                         {selectedAlert && (
                                                             <PalmAlertVisualizer
                                                                 pilrcText={selectedAlert}
@@ -435,11 +436,12 @@ export function PrcExplorerPanel({
                                             </Box>
                                         ) : selectedRecord.entry.type === "MENU" || selectedRecord.entry.type === "MBAR" ? (
                                             <Box>
-                                                <Typography variant="caption" display="block" gutterBottom color="textSecondary">
+                                                <Typography variant="caption" display="block" gutterBottom
+                                                            color="textSecondary">
                                                     PilRC Menu Decoder:
                                                 </Typography>
                                                 <Grid2 container spacing={2}>
-                                                    <Grid2 size={{ xs: 12, md: 6 }}>
+                                                    <Grid2 size={{xs: 12, md: 6}}>
                                                         <Paper
                                                             variant="outlined"
                                                             sx={{
@@ -457,34 +459,45 @@ export function PrcExplorerPanel({
                                                             {selectedMBAR || "Could not decompile this menu resource."}
                                                         </Paper>
                                                     </Grid2>
-                                                    <Grid2 size={{ xs: 12, md: 6 }}>
-                                                        {selectedMBAR && <PalmMenuVisualizer pilrcText={selectedMBAR} />}
+                                                    <Grid2 size={{xs: 12, md: 6}}>
+                                                        {selectedMBAR && <PalmMenuVisualizer pilrcText={selectedMBAR}/>}
                                                     </Grid2>
                                                 </Grid2>
                                             </Box>
                                         ) : (
-                                            <Typography variant="body2" color="textSecondary" sx={{ fontStyle: "italic" }}>
+                                            <Typography variant="body2" color="textSecondary"
+                                                        sx={{fontStyle: "italic"}}>
                                                 No visual handler compiled for type "{selectedRecord.entry.type}".
                                             </Typography>
                                         )}
                                     </Box>
 
-                                    <Divider sx={{ my: 1.5 }} />
+                                    <Divider sx={{my: 1.5}}/>
 
                                     {/* Hex view (always visible) */}
-                                    <Typography variant="caption" display="block" color="textSecondary" sx={{ mb: 0.5 }}>
+                                    <Typography variant="caption" display="block" color="textSecondary" sx={{mb: 0.5}}>
                                         Hex View:
                                     </Typography>
                                     <Paper
                                         variant="outlined"
-                                        sx={{ p: 1, bgcolor: "#1e1e1e", color: "#39ff14", maxHeight: 200, overflowY: "auto", borderRadius: 1 }}
+                                        sx={{
+                                            p: 1,
+                                            bgcolor: "#1e1e1e",
+                                            color: "#39ff14",
+                                            maxHeight: 200,
+                                            overflowY: "auto",
+                                            borderRadius: 1
+                                        }}
                                     >
                                         <Typography
                                             variant="body2"
                                             component="pre"
                                             sx={{
                                                 fontFamily: "'Courier New', Courier, monospace",
-                                                whiteSpace: "pre-wrap", wordBreak: "break-all", m: 0, fontSize: "0.85rem",
+                                                whiteSpace: "pre-wrap",
+                                                wordBreak: "break-all",
+                                                m: 0,
+                                                fontSize: "0.85rem",
                                             }}
                                         >
                                             {formatHexView(selectedBytes)}
