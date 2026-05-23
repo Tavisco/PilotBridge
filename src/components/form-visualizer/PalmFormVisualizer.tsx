@@ -81,9 +81,11 @@ export async function drawPalmOSText(
         color?: string;
         scale?: number;
         lineGap?: number;
+        isBold?: boolean;
     } = {}
 ): Promise<void> {
-    const font = await loadPalmOSFont();
+    console.log(opts.isBold)
+    const font = await loadPalmOSFont(opts.isBold? "/PalmOS-Bold.yaff" : "/PalmOS-Standard.yaff");
     const color = opts.color ?? "#000000";
     const scale = Math.max(1, Math.floor(opts.scale ?? 1));
     const lineGap = opts.lineGap ?? 0;
@@ -116,9 +118,9 @@ function getAdvanceWidth(glyph: PalmGlyph, scale: number): number {
 
 export async function measurePalmOSText(
     text: string,
-    opts: { scale?: number; lineGap?: number } = {}
+    opts: { scale?: number; lineGap?: number; isBold?: boolean } = {}
 ): Promise<{ width: number; height: number }> {
-    const font = await loadPalmOSFont();
+    const font = await loadPalmOSFont(opts.isBold? "/PalmOS-Bold.yaff" : "/PalmOS-Standard.yaff");
     const scale = Math.max(1, Math.floor(opts.scale ?? 1));
     const lineGap = opts.lineGap ?? 0;
 
@@ -160,11 +162,12 @@ export const PalmFormVisualizer = ({pilrcText, renderBitmap}: PalmFormVisualizer
         ctx.imageSmoothingEnabled = false;
 
         const render = async () => {
-            const font = await loadPalmOSFont();
+            const fontStandard = await loadPalmOSFont("/PalmOS-Standard.yaff");
+            const fontBold = await loadPalmOSFont("/PalmOS-Bold.yaff");
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            const measureTextWidth = async (text: string, scale: number) => {
-                const {width} = await measurePalmOSText(text, {scale});
+            const measureTextWidth = async (text: string, scale: number, isBold: boolean) => {
+                const {width} = await measurePalmOSText(text, {scale, isBold});
                 return width;
             };
 
@@ -172,13 +175,13 @@ export const PalmFormVisualizer = ({pilrcText, renderBitmap}: PalmFormVisualizer
                 text: string,
                 x: number,
                 y: number,
-                _isBold = false,
+                isBold: boolean,
                 invert = false
             ) => {
                 const scale = 1;
                 const color = invert ? "#fff" : "#000";
-                const baselineY = y + font.ascent * scale;
-                await drawPalmOSText(ctx, text, x, baselineY, {color, scale});
+                const baselineY = y + (isBold? fontBold.ascent : fontStandard.ascent) * scale;
+                await drawPalmOSText(ctx, text, x, baselineY, {color, scale, isBold});
             };
 
             // --- Form background ---
@@ -190,8 +193,6 @@ export const PalmFormVisualizer = ({pilrcText, renderBitmap}: PalmFormVisualizer
                 ctx.strokeStyle = "#000";
                 ctx.lineWidth = 1;
                 ctx.setLineDash([1, 1]);
-
-                console.log(h)
 
                 const step = 11;
                 for (let offset = step; offset <= h; offset += step) {
@@ -252,8 +253,8 @@ export const PalmFormVisualizer = ({pilrcText, renderBitmap}: PalmFormVisualizer
                     case "title": {
                         const titleText = w.text.replace(/\r/g, "\n");
                         const scale = 1;
-                        const textWidth = await measureTextWidth(titleText, scale);
-                        const textHeight = font.lineHeight * scale; // 11px
+                        const textWidth = await measureTextWidth(titleText, scale, true);
+                        const textHeight = fontBold.lineHeight * scale; // 11px
 
                         const padding = 4; // Horizontal space inside the pill
                         const isModal = form.header.modal;
@@ -301,7 +302,7 @@ export const PalmFormVisualizer = ({pilrcText, renderBitmap}: PalmFormVisualizer
                         const rawText = w.text.replace(/\r/g, "\n");
                         const isBold = w.font === 1 || w.font === 3;
                         const scale = 1;
-                        const textWidth = await measureTextWidth(rawText, scale);
+                        const textWidth = await measureTextWidth(rawText, scale, isBold);
                         const width = textWidth + (isBold ? rawText.length : 0);
 
                         const labelX = resolveCoord(w.at.x, width, formBounds.w, width);
@@ -336,10 +337,10 @@ export const PalmFormVisualizer = ({pilrcText, renderBitmap}: PalmFormVisualizer
 
                         const rawText = w.text.replace(/\r/g, "\n");
                         const scale = 1;
-                        const textWidth = await measureTextWidth(rawText, scale);
-                        const textHeight = font.lineHeight * scale; // 11px
+                        // TODO: Can button be bold?
+                        const textWidth = await measureTextWidth(rawText, scale, false);
+                        const textHeight = fontStandard.lineHeight * scale; // 11px
 
-                        // Center and round to integer pixels to avoid sub‑pixel blur
                         const textX = Math.round(bx + (bw - textWidth) / 2);
                         const textTopY = Math.round(by + (bh - textHeight) / 2) - 1;
 

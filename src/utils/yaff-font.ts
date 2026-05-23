@@ -15,20 +15,26 @@ export type PalmFont = {
     glyphs: Map<string, PalmGlyph>;
 };
 
-let palmFontPromise: Promise<PalmFont> | null = null;
+const palmFontPromises: Record<string, Promise<PalmFont>> = {};
 
-export function loadPalmOSFont(url = "/PalmOS-Standard.yaff"): Promise<PalmFont> {
-    if (!palmFontPromise) {
-        palmFontPromise = fetch(url).then(async (res) => {
+export function loadPalmOSFont(url: string): Promise<PalmFont> {
+    if (!palmFontPromises[url]) {
+        palmFontPromises[url] = fetch(url).then(async (res) => {
             if (!res.ok) {
-                throw new Error(`Failed to load Palm OS font: ${res.status} ${res.statusText}`);
+                // If a fetch fails, delete it from the cache so a retry can be attempted later
+                delete palmFontPromises[url];
+                throw new Error(`Failed to load Palm OS font from ${url}: ${res.status} ${res.statusText}`);
             }
             const text = await res.text();
             return parsePalmOSYaff(text);
+        }).catch((err) => {
+            // Ensure network errors also clear the cache slot
+            delete palmFontPromises[url];
+            throw err;
         });
     }
 
-    return palmFontPromise;
+    return palmFontPromises[url];
 }
 
 function isGlyphLabel(raw: string): boolean {
