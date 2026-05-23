@@ -191,8 +191,10 @@ export const PalmFormVisualizer = ({pilrcText, renderBitmap}: PalmFormVisualizer
                 ctx.lineWidth = 1;
                 ctx.setLineDash([1, 1]);
 
+                console.log(h)
+
                 const step = 11;
-                for (let offset = step; offset < h; offset += step) {
+                for (let offset = step; offset <= h; offset += step) {
                     const currentY = y + offset;
 
                     ctx.moveTo(x, currentY + 0.5);
