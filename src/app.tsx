@@ -32,6 +32,7 @@ import InfoIcon from "@mui/icons-material/Info";
 import InstallMobileIcon from "@mui/icons-material/InstallMobile";
 import HomeIcon from '@mui/icons-material/Home';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import TerminalIcon from '@mui/icons-material/Terminal';
 import { LogViewer } from "./log-viewer";
 import { AboutPanel } from "./panels/about-panel";
 import { HomePanel } from "./panels/home-panel";
@@ -123,6 +124,7 @@ const ConnectionSelector = observer(function ConnectionSelector() {
 export function App() {
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [currentComponent, setCurrentComponent] = React.useState("home");
+  const [logVisible, setLogVisible] = React.useState(true);  // new state
   const drawerWidth = 240;
 
   const handleDrawerToggle = () => {
@@ -318,6 +320,14 @@ export function App() {
             <MenuIcon />
           </IconButton>
           <DoHotsyncBar />
+          <Box sx={{ flexGrow: 1 }} /> {/* pushes the toggle to the right */}
+          <IconButton
+              color="inherit"
+              onClick={() => setLogVisible(prev => !prev)}
+              title="Toggle log viewer"
+          >
+            <TerminalIcon />
+          </IconButton>
         </Toolbar>
       </AppBar>
       <Box
@@ -366,7 +376,7 @@ export function App() {
         <Toolbar />
 
         <Grid container spacing={2}>
-          <Grid item={true} xs={12} md={8}>
+          <Grid item xs={12} md={logVisible ? 8 : 12}>
             <Container
               sx={{
                 paddingX: { xs: 2, sm: 4, md: 1 }, // Adjust padding for different screen sizes
@@ -378,9 +388,11 @@ export function App() {
               {renderComponent()}
             </Container>
           </Grid>
-          <Grid item={true} xs={12} md={4}>
-            <LogViewer />
-          </Grid>
+          {logVisible && (
+              <Grid item xs={12} md={4}>
+                <LogViewer />
+              </Grid>
+          )}
         </Grid>
       </Box>
     </Box>
