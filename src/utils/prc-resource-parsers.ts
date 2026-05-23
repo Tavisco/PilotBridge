@@ -90,11 +90,12 @@ export function escapeQuotedText(text: string): string {
         .replace(/\n/g, "\\n");
 }
 
-export function fmtBounds(r: RectLike | null): string {
-    if (!r) return "(? ? ? ?)";
+export function fmtBounds(r: RectLike, container?: RectLike): string {
+    const x = fmtCoord(r.x, r.w, container?.w, "x");
+    const y = fmtCoord(r.y, r.h, container?.h, "y");
     const ww = r.w === 0 ? "AUTO" : String(r.w);
     const hh = r.h === 0 ? "AUTO" : String(r.h);
-    return `(${r.x} ${r.y} ${ww} ${hh})`;
+    return `(${x} ${y} ${ww} ${hh})`;
 }
 
 export function isPrintableAsciiByte(byte: number): boolean {
@@ -166,6 +167,165 @@ export function formatHexView(bytes: Uint8Array): string {
     return out.join("\n");
 }
 
+function formatRect(r: RectLike): string {
+    return `(${r.x} ${r.y} ${r.w} ${r.h})`;
+}
+
+function formatPoint(r: { x: number; y: number }): string {
+    return `(${r.x} ${r.y})`;
+}
+
+function isDefaultButtonFrame(frame: number): boolean {
+    // PilRC defaults button-like controls to standardButtonFrame (1).
+    return frame === 1;
+}
+
+function formatFormHeader(
+    resourceId: number,
+    formBounds: RectLike,
+    meta: {
+        frameWidth: number;
+        modal: boolean;
+        usable: boolean;
+        saveBehind: boolean;
+        defaultBtnId: number;
+        helpRscId: number;
+        menuRscId: number;
+    }
+): string {
+    const header: string[] = [`FORM ID ${resourceId}`];
+
+    // PilRC stores the actual form bounds in window.windowBounds.
+    header.push(`AT ${formatRect(formBounds)}`);
+
+    return header.join(" ");
+}
+
+function formatFormMetaLines(meta: {
+    frameWidth: number;
+    modal: boolean;
+    usable: boolean;
+    saveBehind: boolean;
+    defaultBtnId: number;
+    helpRscId: number;
+    menuRscId: number;
+}): string[] {
+    const out: string[] = [];
+
+    // In PilRC, a frame is part of the form window metadata.
+    if (meta.frameWidth > 0) out.push("\tFRAME");
+
+    // Modal is explicit.
+    if (meta.modal) out.push("\tMODAL");
+
+    // These are real header fields in the PilRC form struct.
+    if (meta.defaultBtnId > 0) out.push(`\tDEFAULTBTNID ${meta.defaultBtnId}`);
+    if (meta.helpRscId > 0) out.push(`\tHELPID ${meta.helpRscId}`);
+    if (meta.menuRscId > 0) out.push(`\tMENUID ${meta.menuRscId}`);
+
+    // Do not print USABLE / SAVEBEHIND when they are just PilRC defaults.
+    if (!meta.usable) out.push("\tNONUSABLE");
+    if (!meta.saveBehind) out.push("\tNOSAVEBEHIND");
+
+    return out;
+}
+
+function formatLabelLine(
+    l: { id: number; pos: { x: number; y: number }; font: number; text: string; usable: boolean },
+): string {
+    const parts = [
+        `LABEL "${escapeQuotedText(l.text)}"`,
+        `ID ${l.id}`,
+        `AT ${formatPoint(l.pos)}`,
+    ];
+
+    // PilRC defaults label font to 0 and usable to true.
+    if (l.font > 0) parts.push(`FONT ${l.font}`);
+    if (!l.usable) parts.push("NONUSABLE");
+
+    return parts.join(" ");
+}
+
+function formatButtonLine(
+    c: {
+        id: number;
+        rect: RectLike;
+        style: number;
+        font: number;
+        group: number;
+        text: string;
+        usable: boolean;
+        enabled: boolean;
+        visible: boolean;
+        on: boolean;
+        leftAnchor: boolean;
+        frame: number;
+    },
+    formBounds: RectLike
+): string {
+    const parts = [
+        `BUTTON "${escapeQuotedText(c.text)}"`,
+        `ID ${c.id}`,
+        `AT ${fmtBounds(c.rect, formBounds)}`,
+    ];
+
+    // PilRC default state: usable/enabled/visible/leftAnchor/frame=standard.
+    if (!c.usable) parts.push("NONUSABLE");
+    if (!c.enabled) parts.push("DISABLED");
+    if (!c.visible) parts.push("HIDDEN");
+    if (c.on) parts.push("ON");
+    if (!c.leftAnchor) parts.push("RIGHTANCHOR");
+
+    if (c.frame === 0) parts.push("NOFRAME");
+    else if (c.frame === 2) parts.push("BOLDFRAME");
+    else if (c.frame === 3) parts.push("RECTFRAME");
+    // frame === 1 is PilRC's default, omit it
+
+    if (c.font > 0) parts.push(`FONT ${c.font}`);
+    if (c.group > 0) parts.push(`GROUP ${c.group}`);
+
+    return parts.join(" ");
+}
+
+function fmtCoord(value: number, extent: number, containerExtent: number | undefined, axis: "x" | "y"): string {
+    if (containerExtent == null) return String(value);
+
+    // PilRC can resolve CENTER / RIGHT / BOTTOM. We can recover those
+    // when the stored coordinates match the resolved result.
+    if (extent > 0 && value === Math.floor((containerExtent - extent) / 2)) {
+        return "CENTER";
+    }
+    if (extent > 0 && value === containerExtent - extent) {
+        return axis === "x" ? "RIGHT" : "BOTTOM";
+    }
+    return String(value);
+}
+
+function parseFormHeader68K(reader: PalmBinaryReader) {
+    const windowFlags = reader.u16be(0x08);
+
+    return {
+        formId: reader.u16be(0x28),
+        bounds: {
+            x: reader.i16be(0x0A),
+            y: reader.i16be(0x0C),
+            w: reader.i16be(0x0E),
+            h: reader.i16be(0x10),
+        },
+        frameWidth: reader.u8(0x1F),
+
+        modal: (windowFlags & 0x0200) !== 0,
+
+        defaultBtnId: reader.u16be(0x38),
+        helpRscId: reader.u16be(0x3A),
+        menuRscId: reader.u16be(0x3C),
+        numObjects: reader.u16be(0x3E),
+
+        usable: (reader.u16be(0x2A) & 0x8000) !== 0,
+        saveBehind: (reader.u16be(0x2A) & 0x0800) !== 0,
+    };
+}
+
 // --- main tFRM decompiler ---
 export function decodeTFRM(
     data: Uint8Array | number[] | ArrayBuffer,
@@ -174,41 +334,35 @@ export function decodeTFRM(
     const bytes = toUint8Array(data);
     const reader = new PalmBinaryReader(bytes);
 
-    const formAttr = reader.u16be(0x2a);
-    const defaultBtnId = reader.u16be(0x38);
-    const numObjects = reader.u16be(0x3e);
-    const formBounds: RectLike = {
-        x: reader.i16be(0x14),
-        y: reader.i16be(0x16),
-        w: reader.i16be(0x18),
-        h: reader.i16be(0x1a),
-    };
+    const form = parseFormHeader68K(reader);
 
-    const fUsable = !!(formAttr & 0x8000);
-    const fEnabled = !!(formAttr & 0x4000);
-    const fVisible = !!(formAttr & 0x2000);
-    const fSaveBehind = !!(formAttr & 0x0800);
-    const fDoingDialog = !!(formAttr & 0x0100);
+    const lines: string[] = [];
+    lines.push(`FORM ID ${resourceId} AT ${fmtBounds(form.bounds)}`);
 
-    const formFlags: string[] = [];
-    if (fUsable) formFlags.push("USABLE");
-    if (fEnabled) formFlags.push("ENABLED");
-    if (fVisible) formFlags.push("VISIBLE");
-    if (fSaveBehind) formFlags.push("SAVEBEHIND");
-    if (fDoingDialog) formFlags.push("MODAL");
+    if (form.frameWidth > 0) lines.push("\tFRAME");
+    if (form.modal) lines.push("\tMODAL");
+    if (form.defaultBtnId > 0) lines.push(`\tDEFAULTBTNID ${form.defaultBtnId}`);
+    if (form.helpRscId > 0) lines.push(`\tHELPID ${form.helpRscId}`);
+    if (form.menuRscId > 0) lines.push(`\tMENUID ${form.menuRscId}`);
+
+    // Do not print defaults unless they are explicitly disabled.
+    if (!form.usable) lines.push("\tNONUSABLE");
+    if (!form.saveBehind) lines.push("\tNOSAVEBEHIND");
+
+    lines.push("BEGIN");
 
     const dirStart = 0x44;
     const dirEntrySize = 6;
     const objects: { type: number; offset: number }[] = [];
 
-    for (let i = 0; i < numObjects; i++) {
+    for (let i = 0; i < form.numObjects; i++) {
         const entryOffset = dirStart + i * dirEntrySize;
-        const type = reader.u8(entryOffset);
-        const objOff = reader.u32be(entryOffset + 2);
-        objects.push({ type, offset: objOff });
+        objects.push({
+            type: reader.u8(entryOffset),
+            offset: reader.u32be(entryOffset + 2),
+        });
     }
 
-    const objectLines: string[] = [];
     for (const obj of objects) {
         let line = "";
         switch (obj.type) {
@@ -224,70 +378,41 @@ export function decodeTFRM(
                     `ID ${l.id}`,
                     `AT (${l.pos.x} ${l.pos.y})`,
                 ];
-                if (l.usable) parts.push("USABLE");
-                parts.push(`FONT ${l.font}`);
+                if (l.font > 0) parts.push(`FONT ${l.font}`);
                 line = parts.join(" ");
                 break;
             }
             case 1: {
                 const c = parseControl(reader, obj.offset);
-                const styleNames = [
-                    "BUTTON",
-                    "PUSHBUTTON",
-                    "CHECKBOX",
-                    "POPUPTRIGGER",
-                    "SELECTORTRIGGER",
-                    "REPEATBUTTON",
-                    "SLIDER",
-                    "FEEDBACKSLIDER",
-                ];
-                const styleName = styleNames[c.style] ?? "BUTTON";
                 const parts = [
-                    styleName,
-                    `"${escapeQuotedText(c.text)}"`,
+                    `BUTTON "${escapeQuotedText(c.text)}"`,
                     `ID ${c.id}`,
-                    `AT ${fmtBounds(c.rect)}`,
+                    `AT ${fmtBounds(c.rect, form.bounds)}`,
                 ];
-                if (c.usable) parts.push("USABLE");
-                if (c.leftAnchor) parts.push("LEFTANCHOR");
-                if (c.frame === 1) parts.push("FRAME");
-                else if (c.frame === 0) parts.push("NOFRAME");
+                if (!c.usable) parts.push("NONUSABLE");
+                if (!c.enabled) parts.push("DISABLED");
+                if (!c.visible) parts.push("HIDDEN");
+                if (c.on) parts.push("ON");
+                if (!c.leftAnchor) parts.push("RIGHTANCHOR");
+                if (c.frame === 0) parts.push("NOFRAME");
+                else if (c.frame === 2) parts.push("BOLDFRAME");
+                else if (c.frame === 3) parts.push("RECTFRAME");
                 line = parts.join(" ");
                 break;
             }
             case 4: {
                 const bm = parseFormBitmap(reader, obj.offset);
-                const parts = [
-                    "FORMBITMAP",
-                    `AT (${bm.pos.x} ${bm.pos.y})`,
-                    `BITMAP ${bm.rscID}`,
-                ];
-                if (bm.usable) parts.push("USABLE");
-                line = parts.join(" ");
-                break;
-            }
-            case 0: {
-                const f = parseField(reader, obj.offset);
-                line = `FIELD ID ${f.id} AT ${fmtBounds(f.rect)} MAXCHARS ${f.maxChars}`;
+                line = `FORMBITMAP AT (${bm.pos.x} ${bm.pos.y}) BITMAP ${bm.rscID}`;
                 break;
             }
             default:
                 line = `OBJECT ${kindName(obj.type)}`;
         }
-        objectLines.push(`  ${line}`);
+
+        lines.push(`\t${line}`);
     }
 
-    const headerParts = [`FORM ID ${resourceId}`];
-    if (formBounds.w > 0 || formBounds.h > 0) {
-        headerParts.push(`AT ${fmtBounds(formBounds)}`);
-    }
-    const lines = [headerParts.join(" ")];
-    if (formFlags.length > 0) lines.push(`\tFRAME ${formFlags.join(" ")}`);
-    if (defaultBtnId > 0) lines.push(`\tDEFAULTBTNID ${defaultBtnId}`);
-    lines.push("BEGIN");
-    lines.push(...objectLines);
     lines.push("END");
-
     return lines.join("\n");
 }
 
