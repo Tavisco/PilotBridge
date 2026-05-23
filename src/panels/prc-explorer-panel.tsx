@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, type ChangeEvent } from "react";
+import {useState, useMemo, useEffect, type ChangeEvent, useRef} from "react";
 import {
     Box,
     Typography,
@@ -31,6 +31,8 @@ import {
     decodeTSTR,
     formatHexView,
 } from "../utils/prc-resource-parsers";
+
+import fontSpritesheet from "../assets/Palm OS.png";
 
 interface PalmFormVisualizerProps {
     pilrcText: string;
@@ -418,299 +420,365 @@ function parseWidgets(pilrcText: string, form: ParsedFormHeader): ParsedWidget[]
     return widgets;
 }
 
-function PalmButton({
-                        widget,
-                        formWidth,
-                    }: {
-    widget: Extract<ParsedWidget, { kind: "button" }>;
-    formWidth: number;
-}) {
-    const width = widget.rect.w || Math.max(26, estimateTextWidth(widget.text, 9) + 10);
-    const height = widget.rect.h || 12;
-    const left = widget.rect.x; // now absolute
-    const top = widget.rect.y;
+export interface PalmFormVisualizerProps {
+    pilrcText: string;
+    renderBitmap?: (id: number | string) => HTMLImageElement | string | null;
+    // Pass your loaded Construct 3 PNG spritesheet here
+    fontImage?: HTMLImageElement | null;
+}
 
-    const frameStyle =
-        widget.frame === "NOFRAME"
-            ? { border: "none", boxShadow: "none", borderRadius: 0 }
-            : widget.frame === "BOLDFRAME"
-                ? { border: "2px solid #000" }
-                : widget.frame === "RECTFRAME"
-                    ? { borderRadius: 0 }
-                    : {}; // default round rect with 1px border
+// 1. Build the lookup map from your Construct 3 Spacing Data
+const buildCharWidthMap = () => {
+    const map: Record<string, number> = {};
+    const data: [number, string][] = [
+        [3.0, " "], [4.0, "!'.:Iil|"], [7.0, "\"()-EFJcrstz{}"], [13.0, "#%@MWm"],
+        [10.0, "$*+<=>DGHKNTUVXYZ^vwxy"], [11.0, "&OQ~"], [5.0, ",1;[]`j"],
+        [8.0, "/023456789?ABCLPRS\\_abdefghknopqu"]
+    ];
 
+    data.forEach(([width, chars]) => {
+        for (let i = 0; i < chars.length; i++) {
+            map[chars[i]] = width;
+        }
+    });
+    return map;
+};
+
+const CHAR_WIDTHS = buildCharWidthMap();
+const DEFAULT_CHAR_WIDTH = 8;
+
+// 2. Exact pixel-width estimator
+const measureBitmapText = (text: string) => {
+    let width = 0;
+    for (const char of text) {
+        width += CHAR_WIDTHS[char] || DEFAULT_CHAR_WIDTH;
+    }
+    return width;
+};
+
+interface PalmGlyph {
+    width: number;          // raster width (pixels)
+    rows: string[];         // pixel rows (. and @)
+    rightBearing?: number;  // from per-glyph property
+    leftBearing?: number;
+    shiftUp?: number;       // vertical offset
+    scalableWidth?: number; // overrides advance if present
+}
+
+type PalmFont = {
+    ascent: number;
+    descent: number;
+    lineHeight: number;
+    defaultChar: string;
+    glyphs: Map<string, PalmGlyph>;
+};
+
+let palmFontPromise: Promise<PalmFont> | null = null;
+
+export function loadPalmOSFont(url = "/PalmOS-Standard.yaff"): Promise<PalmFont> {
+    if (!palmFontPromise) {
+        palmFontPromise = fetch(url).then(async (res) => {
+            if (!res.ok) {
+                throw new Error(`Failed to load Palm OS font: ${res.status} ${res.statusText}`);
+            }
+            const text = await res.text();
+            console.info("Yaff Loaded!");
+            return parsePalmOSYaff(text);
+        });
+    }
+
+    return palmFontPromise;
+}
+function isGlyphLabel(raw: string): boolean {
+    const first = raw.charAt(0);
     return (
-        <Box
-            sx={{
-                position: "absolute",
-                left,
-                top,
-                width,
-                height,
-                boxSizing: "border-box",
-                border: "1px solid #000",
-                borderRadius: "3px",
-                bgcolor: widget.defaultBtn ? "#000" : "#e5e5e5",
-                color: widget.defaultBtn ? "#fff" : "#000",
-                boxShadow: widget.defaultBtn ? "none" : "1px 1px 0 #000",
-                opacity: widget.hidden ? 0.35 : 1,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                px: "3px",
-                fontSize: "9px",
-                fontWeight: 700,
-                lineHeight: "10px",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-                fontFamily: "PalmOS, monospace",
-                ...frameStyle,
-            }}
-        >
-            {widget.text}
-        </Box>
+        /^\d/.test(raw) ||                     // e.g. 0x20, 32
+        first === "'" ||                       // 'A'
+        first === '"' ||                       // "latin_a"
+        raw.toLowerCase().startsWith("u+")     // u+0041
     );
 }
 
-function PalmField({ widget }: { widget: Extract<ParsedWidget, { kind: "field" }> }) {
+function normalizeLabel(raw: string): string {
+    // Strip surrounding quotes (single or double)
+    if (
+        (raw.startsWith('"') && raw.endsWith('"')) ||
+        (raw.startsWith("'") && raw.endsWith("'"))
+    ) {
+        raw = raw.slice(1, -1);
+    }
+
+    // Codepoint labels (e.g., 0x20, 32, 0o40) → canonical "0x" + uppercase hex
+    if (/^\d/.test(raw) || /^0[xX]/i.test(raw)) {
+        let num: number;
+        if (raw.startsWith("0x") || raw.startsWith("0X")) {
+            num = parseInt(raw.slice(2), 16);
+        } else if (raw.startsWith("0o") || raw.startsWith("0O")) {
+            num = parseInt(raw.slice(2), 8);
+        } else {
+            num = parseInt(raw, 10);
+        }
+        return "0x" + num.toString(16).toUpperCase().padStart(2, "0");
+    }
+
+    // Unicode character labels (e.g., u+0041) → actual character
+    if (raw.toLowerCase().startsWith("u+")) {
+        const hex = raw.slice(2);
+        const cp = parseInt(hex, 16);
+        return String.fromCodePoint(cp);
+    }
+
+    // Everything else (plain characters, tags without quotes) stays as‑is
+    return raw;
+}
+
+function parsePalmOSYaff(text: string): PalmFont {
+    const lines = text.replace(/\r/g, "").split("\n");
+    const meta = new Map<string, string>();
+    const glyphs = new Map<string, PalmGlyph>();
+
+    let i = 0;
+    let inProperties = true;
+
+    while (i < lines.length) {
+        const line = lines[i];
+
+        // Skip blank lines and comments
+        if (!line.trim() || line.trim().startsWith("#")) {
+            i++;
+            continue;
+        }
+
+        // Try to detect a glyph label first
+        const labelMatch = /^([^:]+):\s*$/.exec(line);
+        if (labelMatch) {
+            const rawLabel = labelMatch[1].trim();
+            if (isGlyphLabel(rawLabel)) {
+                if (inProperties) {
+                    inProperties = false; // switch to glyph mode
+                }
+                // Parse the glyph starting at i
+                i = parseGlyph(lines, i, rawLabel, glyphs);
+                continue;
+            }
+        }
+
+        // Global properties
+        if (inProperties) {
+            const propMatch = /^([\w.-]+):\s*(.*)?$/.exec(line);
+            if (propMatch) {
+                const key = propMatch[1].toLowerCase().replace(/-/g, "_");
+                let value = propMatch[2]?.trim() ?? "";
+                if (value === "") {
+                    i++;
+                    const valueLines: string[] = [];
+                    while (i < lines.length && /^\s/.test(lines[i])) {
+                        valueLines.push(lines[i].trim());
+                        i++;
+                    }
+                    value = valueLines.join("\n");
+                    if (value.startsWith('"') && value.endsWith('"')) {
+                        value = value.slice(1, -1);
+                    }
+                    meta.set(key, value);
+                    continue;
+                }
+                meta.set(key, value);
+                i++;
+                continue;
+            }
+            // Line not a property or label → switch to glyphs anyway
+            inProperties = false;
+            continue;
+        }
+
+        // Unknown line in glyph area – skip
+        i++;
+    }
+
+    return {
+        ascent: Number(meta.get("ascent") ?? 9),
+        descent: Number(meta.get("descent") ?? 2),
+        lineHeight: Number(meta.get("line_height") ?? 11),
+        defaultChar: meta.get("default_char") ?? "missing",
+        glyphs,
+    };
+}
+
+// Move the glyph parsing into its own function
+function parseGlyph(
+    lines: string[],
+    startIdx: number,
+    rawLabel: string,
+    glyphs: Map<string, PalmGlyph>
+): number {
+    let i = startIdx + 1; // skip the label line
+    const rows: string[] = [];
+    let rightBearing, leftBearing, shiftUp, scalableWidth: number | undefined;
+    let emptyGlyph = false;
+
+    while (i < lines.length) {
+        const l = lines[i];
+        if (!/^\s/.test(l)) break;
+
+        const trimmed = l.trim();
+        if (trimmed === "") {
+            i++;
+            continue;
+        }
+
+        if (/^[\w.-]+\s*:/.test(trimmed)) {
+            const [pKey, pVal] = trimmed.split(":").map(s => s.trim());
+            switch (pKey.toLowerCase().replace(/-/g, "_")) {
+                case "right_bearing": case "tracking": rightBearing = Number(pVal); break;
+                case "left_bearing": leftBearing = Number(pVal); break;
+                case "shift_up": case "offset": shiftUp = Number(pVal.split(/\s+/)[1] ?? pVal); break;
+                case "scalable_width": scalableWidth = Number(pVal); break;
+            }
+            i++;
+            continue;
+        }
+
+        if (trimmed === "-") {
+            emptyGlyph = true;
+            i++;
+            break;
+        }
+
+        if (!/^[.@\s]+$/.test(trimmed)) break;
+
+        rows.push(l.replace(/^\s+/, ""));
+        i++;
+    }
+
+    // Use the normalizeLabel that is accessible (we'll pass it or define outside)
+    const key = normalizeLabel(rawLabel);
+    if (rows.length > 0) {
+        const width = Math.max(...rows.map(r => r.length));
+        const glyph: PalmGlyph = { width, rows };
+        if (rightBearing !== undefined) glyph.rightBearing = rightBearing;
+        if (leftBearing !== undefined) glyph.leftBearing = leftBearing;
+        if (shiftUp !== undefined) glyph.shiftUp = shiftUp;
+        if (scalableWidth !== undefined) glyph.scalableWidth = scalableWidth;
+        glyphs.set(key, glyph);
+    } else if (emptyGlyph) {
+        glyphs.set(key, { width: 0, rows: [] });
+    }
+    return i;
+}
+
+function codepointKey(ch: string): string {
+    const cp = ch.codePointAt(0);
+    if (cp == null) return "missing";
+    return "0x" + cp.toString(16).toUpperCase().padStart(2, "0");
+}
+
+function resolveGlyph(font: PalmFont, ch: string): PalmGlyph | undefined {
     return (
-        <Box
-            sx={{
-                position: "absolute",
-                left: widget.rect.x,
-                top: widget.rect.y,
-                width: widget.rect.w,
-                height: widget.rect.h,
-                boxSizing: "border-box",
-                border: "1px solid #000",
-                bgcolor: "#fff",
-                borderRadius: "2px",
-                overflow: "hidden",
-            }}
-        >
-            <Box
-                sx={{
-                    position: "absolute",
-                    left: 2,
-                    right: 2,
-                    bottom: 2,
-                    borderBottom: "1px dotted #000",
-                    opacity: widget.editable ? 1 : 0.55,
-                }}
-            />
-            <Box
-                sx={{
-                    position: "absolute",
-                    inset: 0,
-                    px: "2px",
-                    py: "1px",
-                    fontSize: "9px",
-                    fontFamily: "PalmOS, monospace",
-                    lineHeight: "10px",
-                    color: "#000",
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                }}
-            >
-                {widget.maxChars ? `Field (${widget.maxChars})` : "Field"}
-            </Box>
-        </Box>
+        font.glyphs.get(codepointKey(ch)) ??
+        font.glyphs.get(ch) ??
+        font.glyphs.get(font.defaultChar) ??
+        font.glyphs.get("missing")
     );
 }
 
-function PalmList({ widget }: { widget: Extract<ParsedWidget, { kind: "list" }> }) {
-    const visible = Math.max(1, widget.visibleItems ?? Math.min(widget.items.length || 1, 4));
-    return (
-        <Box
-            sx={{
-                position: "absolute",
-                left: widget.rect.x,
-                top: widget.rect.y,
-                width: widget.rect.w,
-                height: widget.rect.h || visible * 11 + 2,
-                boxSizing: "border-box",
-                border: "1px solid #000",
-                bgcolor: "#fff",
-                overflow: "hidden",
-            }}
-        >
-            {Array.from({ length: visible }).map((_, i) => {
-                const text = widget.items[i] ?? "";
-                return (
-                    <Box
-                        key={i}
-                        sx={{
-                            height: 11,
-                            px: "2px",
-                            display: "flex",
-                            alignItems: "center",
-                            borderBottom: i < visible - 1 ? "1px solid #ddd" : "none",
-                            bgcolor: i === 0 ? "#000" : "transparent",
-                            color: i === 0 ? "#fff" : "#000",
-                            fontSize: "8px",
-                            fontFamily: "PalmOS, monospace",
-                            lineHeight: "10px",
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                        }}
-                    >
-                        {text || (widget.search ? "Search…" : "Item")}
-                    </Box>
+function getAdvanceWidth(glyph: PalmGlyph, scale: number): number {
+    if (glyph.scalableWidth !== undefined) return glyph.scalableWidth * scale;
+    const l = glyph.leftBearing ?? 0;
+    const r = glyph.rightBearing ?? 0;
+    return (l + glyph.width + r) * scale;
+}
+
+function drawGlyph(
+    ctx: CanvasRenderingContext2D,
+    glyph: PalmGlyph,
+    x: number,         // left edge (pixels)
+    topY: number,      // top of glyph raster (pixels)
+    color: string,
+    scale: number
+) {
+    ctx.save();
+    ctx.fillStyle = color;
+
+    for (let row = 0; row < glyph.rows.length; row++) {
+        const line = glyph.rows[row];
+        for (let col = 0; col < glyph.width; col++) {
+            if (col < line.length && line[col] === "@") {
+                ctx.fillRect(
+                    x + col * scale,
+                    topY + row * scale,
+                    scale,
+                    scale
                 );
-            })}
-        </Box>
-    );
+            }
+        }
+    }
+
+    ctx.restore();
 }
 
-function PalmTable({ widget }: { widget: Extract<ParsedWidget, { kind: "table" }> }) {
-    const cols = Math.max(1, widget.numColumns ?? 2);
-    const rows = Math.max(1, widget.numRows ?? 3);
-    const cellW = Math.max(12, Math.floor((widget.rect.w || 60) / cols));
-    const cellH = 10;
+export async function drawPalmOSText(
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    baselineX: number,
+    baselineY: number,   // <-- changed: this is now the baseline
+    opts: {
+        color?: string;
+        scale?: number;
+        lineGap?: number;
+    } = {}
+): Promise<void> {
+    const font = await loadPalmOSFont();
+    const color = opts.color ?? "#000000";
+    const scale = Math.max(1, Math.floor(opts.scale ?? 1));
+    const lineGap = opts.lineGap ?? 0;
 
-    return (
-        <Box
-            sx={{
-                position: "absolute",
-                left: widget.rect.x,
-                top: widget.rect.y,
-                width: widget.rect.w,
-                height: widget.rect.h || rows * cellH + 2,
-                boxSizing: "border-box",
-                border: "1px solid #000",
-                bgcolor: "#fff",
-                overflow: "hidden",
-            }}
-        >
-            {Array.from({ length: rows }).map((_, r) => (
-                <Box key={r} sx={{ display: "flex", height: cellH }}>
-                    {Array.from({ length: cols }).map((__, c) => (
-                        <Box
-                            key={c}
-                            sx={{
-                                width: cellW,
-                                borderRight: c < cols - 1 ? "1px solid #000" : "none",
-                                borderBottom: r < rows - 1 ? "1px solid #000" : "none",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                fontSize: "7px",
-                                fontFamily: "PalmOS, monospace",
-                            }}
-                        >
-                            &nbsp;
-                        </Box>
-                    ))}
-                </Box>
-            ))}
-        </Box>
-    );
+    let penY = baselineY;
+
+    for (const line of text.split("\n")) {
+        let penX = baselineX;
+
+        for (const ch of [...line]) {
+            const glyph = resolveGlyph(font, ch);
+            if (!glyph) continue;
+
+            const topY = penY - font.ascent * scale;   // <-- raster top
+            drawGlyph(ctx, glyph, penX, topY, color, scale);
+
+            penX += getAdvanceWidth(glyph, scale);
+        }
+
+        penY += (font.lineHeight + lineGap) * scale;
+    }
 }
 
-function PalmScrollbar({ widget }: { widget: Extract<ParsedWidget, { kind: "scrollbar" }> }) {
-    const w = widget.rect.w || 7;
-    const h = widget.rect.h || 48;
-    const min = widget.minValue ?? 0;
-    const max = widget.maxValue ?? 100;
-    const value = widget.value ?? min;
-    const pct = max > min ? Math.max(0, Math.min(1, (value - min) / (max - min))) : 0;
-    const thumbH = Math.max(10, Math.floor(h * 0.25));
-    const thumbY = Math.floor((h - thumbH - 2) * pct) + 1;
+export async function measurePalmOSText(
+    text: string,
+    opts: { scale?: number; lineGap?: number } = {}
+): Promise<{ width: number; height: number }> {
+    const font = await loadPalmOSFont();
+    const scale = Math.max(1, Math.floor(opts.scale ?? 1));
+    const lineGap = opts.lineGap ?? 0;
 
-    return (
-        <Box
-            sx={{
-                position: "absolute",
-                left: widget.rect.x,
-                top: widget.rect.y,
-                width: w,
-                height: h,
-                border: "1px solid #000",
-                bgcolor: "#fff",
-                boxSizing: "border-box",
-            }}
-        >
-            <Box
-                sx={{
-                    position: "absolute",
-                    left: 1,
-                    right: 1,
-                    top: thumbY,
-                    height: thumbH,
-                    bgcolor: "#000",
-                }}
-            />
-        </Box>
-    );
+    const lines = text.split("\n");
+    let maxWidth = 0;
+
+    for (const line of lines) {
+        let w = 0;
+        for (const ch of [...line]) {
+            const glyph = resolveGlyph(font, ch);
+            if (glyph) w += getAdvanceWidth(glyph, scale);
+        }
+        maxWidth = Math.max(maxWidth, w);
+    }
+
+    const height = lines.length * (font.lineHeight + lineGap) * scale;
+    return { width: maxWidth, height };
 }
 
-function PalmSlider({ widget }: { widget: Extract<ParsedWidget, { kind: "slider" }> }) {
-    const vertical = widget.vertical || widget.rect.h > widget.rect.w;
-    const min = widget.minValue ?? 0;
-    const max = widget.maxValue ?? 100;
-    const value = widget.value ?? min;
-    const pct = max > min ? Math.max(0, Math.min(1, (value - min) / (max - min))) : 0.5;
+export const PalmFormVisualizer = ({ pilrcText, renderBitmap, fontImage }: PalmFormVisualizerProps) => {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
 
-    const railInset = 3;
-    const thumbSize = 6;
-    const travel = vertical
-        ? Math.max(0, widget.rect.h - thumbSize - railInset * 2)
-        : Math.max(0, widget.rect.w - thumbSize - railInset * 2);
-    const thumbPos = railInset + Math.floor(travel * pct);
-
-    return (
-        <Box
-            sx={{
-                position: "absolute",
-                left: widget.rect.x,
-                top: widget.rect.y,
-                width: widget.rect.w,
-                height: widget.rect.h,
-                border: "1px solid #000",
-                bgcolor: "#fff",
-                boxSizing: "border-box",
-                overflow: "hidden",
-            }}
-        >
-            <Box
-                sx={{
-                    position: "absolute",
-                    ...(vertical
-                        ? {
-                            left: "50%",
-                            top: railInset,
-                            bottom: railInset,
-                            width: 1,
-                            transform: "translateX(-50%)",
-                            bgcolor: "#000",
-                        }
-                        : {
-                            top: "50%",
-                            left: railInset,
-                            right: railInset,
-                            height: 1,
-                            transform: "translateY(-50%)",
-                            bgcolor: "#000",
-                        }),
-                }}
-            />
-            <Box
-                sx={{
-                    position: "absolute",
-                    ...(vertical
-                        ? { left: 1, top: thumbPos, width: widget.rect.w - 2, height: thumbSize }
-                        : { top: 1, left: thumbPos, width: thumbSize, height: widget.rect.h - 2 }),
-                    bgcolor: "#000",
-                }}
-            />
-        </Box>
-    );
-}
-
-export const PalmFormVisualizer = ({ pilrcText, renderBitmap }: PalmFormVisualizerProps) => {
     const form = useMemo(() => {
         const header = parseFormHeader(pilrcText);
         const widgets = parseWidgets(pilrcText, header);
@@ -720,6 +788,152 @@ export const PalmFormVisualizer = ({ pilrcText, renderBitmap }: PalmFormVisualiz
     const outerW = 320;
     const outerH = 320;
     const formBounds = form.header.bounds;
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        // Keep pixel‑perfect rendering
+        ctx.imageSmoothingEnabled = false;
+
+        // Async drawing function
+        const render = async () => {
+            // Load the font once (cached)
+            const font = await loadPalmOSFont();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Helper – measure text width using the loaded font
+            const measureTextWidth = (text: string, scale: number) => {
+                let w = 0;
+                for (const ch of text) {
+                    const glyph = resolveGlyph(font, ch);
+                    if (glyph) w += getAdvanceWidth(glyph, scale);
+                }
+                return w;
+            };
+
+            // Bitmap text blitter – draws at given top‑left (x, y), not baseline
+            const drawBitmapText = async (
+                text: string,
+                x: number,
+                y: number,
+                isBold = false,
+                invert = false
+            ) => {
+                const scale = 1;
+                const color = invert ? "#fff" : "#000";
+                // Convert “top of cell” (y) to baseline using the font's ascent
+                const baselineY = y + font.ascent * scale;
+                await drawPalmOSText(ctx, text, x, baselineY, { color, scale });
+            };
+
+            // --- Form background ---
+            ctx.fillStyle = "#fff";
+            ctx.fillRect(formBounds.x, formBounds.y, formBounds.w, formBounds.h);
+
+            if (form.header.modal) {
+                ctx.strokeStyle = "#000";
+                ctx.lineWidth = 2;
+                ctx.strokeRect(formBounds.x, formBounds.y, formBounds.w, formBounds.h);
+            }
+
+            const drawDottedLine = (x: number, y: number, w: number) => {
+                ctx.beginPath();
+                ctx.strokeStyle = "#000";
+                ctx.lineWidth = 1;
+                ctx.setLineDash([1, 1]);
+                ctx.moveTo(x, y + 0.5);
+                ctx.lineTo(x + w, y + 0.5);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            };
+
+            const drawButtonRect = (x: number, y: number, w: number, h: number) => {
+                ctx.fillStyle = "#000";
+                ctx.fillRect(x + 1, y, w - 2, 1);
+                ctx.fillRect(x + 1, y + h - 1, w - 2, 1);
+                ctx.fillRect(x, y + 1, 1, h - 2);
+                ctx.fillRect(x + w - 1, y + 1, 1, h - 2);
+            };
+
+            // --- Draw widgets (now with awaited text) ---
+            for (const w of form.widgets) {
+                const xOffset = formBounds.x;
+                const yOffset = formBounds.y;
+
+                switch (w.kind) {
+                    case "title":
+                        ctx.fillStyle = "#000";
+                        ctx.fillRect(xOffset, yOffset, formBounds.w, 12);
+                        // Title bar: inverted text
+                        await drawBitmapText(w.text, xOffset + 3, yOffset + 1, true, true);
+                        break;
+
+                    case "label": {
+                        const text = w.text.replace(/\r/g, "\n");
+                        const isBold = w.font === 1 || w.font === 3;
+
+                        const textWidth = measureTextWidth(text, 2);
+                        const width = textWidth + (isBold ? text.length : 0); // bold adds ~1px per char
+
+                        const labelX = resolveCoord(w.at.x, width, formBounds.w, width);
+                        const labelY = resolveCoord(w.at.y, 11 + 2, formBounds.h, 11 + 2); // cell height ~13
+
+                        await drawBitmapText(text, xOffset + labelX, yOffset + labelY, isBold);
+                        break;
+                    }
+
+                    case "bitmap": {
+                        const bitX = xOffset + w.at.x;
+                        const bitY = yOffset + w.at.y;
+                        const imageSource = renderBitmap ? renderBitmap(w.id) : null;
+
+                        if (imageSource instanceof HTMLImageElement && imageSource.complete) {
+                            ctx.drawImage(imageSource, bitX, bitY);
+                        } else {
+                            ctx.fillStyle = "#f5f5f5";
+                            ctx.fillRect(bitX, bitY, 18, 18);
+                            ctx.strokeStyle = "#000";
+                            ctx.setLineDash([2, 2]);
+                            ctx.strokeRect(bitX, bitY, 18, 18);
+                            ctx.setLineDash([]);
+                        }
+                        break;
+                    }
+
+                    case "line":
+                        ctx.fillStyle = "#000";
+                        ctx.fillRect(xOffset + w.rect.x, yOffset + w.rect.y, Math.max(1, w.rect.w), 1);
+                        break;
+
+                    case "frame":
+                    case "rectangle":
+                    case "list":
+                    case "table":
+                    case "scrollbar":
+                    case "slider":
+                        ctx.strokeStyle = "#000";
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(xOffset + w.rect.x, yOffset + w.rect.y, w.rect.w, w.rect.h);
+                        break;
+
+                    case "gadget":
+                        ctx.fillStyle = "rgba(0,0,0,0.05)";
+                        ctx.fillRect(xOffset + w.rect.x, yOffset + w.rect.y, w.rect.w, w.rect.h);
+                        ctx.strokeStyle = "#000";
+                        ctx.lineWidth = 1;
+                        ctx.setLineDash([2, 2]);
+                        ctx.strokeRect(xOffset + w.rect.x, yOffset + w.rect.y, w.rect.w, w.rect.h);
+                        ctx.setLineDash([]);
+                        break;
+                }
+            }
+        };
+
+        render();
+    }, [form, renderBitmap, fontImage, formBounds]);
 
     return (
         <Box
@@ -737,214 +951,30 @@ export const PalmFormVisualizer = ({ pilrcText, renderBitmap }: PalmFormVisualiz
                 sx={{
                     width: 160,
                     height: 160,
-                    backgroundColor: "#fff",
                     position: "relative",
                     transform: "scale(2)",
                     transformOrigin: "center center",
-                    border: form.header.modal ? "2px solid #000" : "1px solid #999",
                     boxShadow: "0px 4px 12px rgba(0,0,0,0.15)",
-                    fontFamily: "sans-serif",
-                    overflow: "hidden",
-                    boxSizing: "border-box",
-                    // Subtle dot grid (classic Palm look)
                     backgroundImage: "radial-gradient(#d3d3d3 1px, transparent 1px)",
                     backgroundSize: "4px 4px",
+                    bgcolor: "#fff",
                 }}
             >
-                {/* Form content area */}
-                <Box
-                    sx={{
-                        position: "absolute",
-                        left: formBounds.x,
-                        top: formBounds.y,
-                        width: formBounds.w,
-                        height: formBounds.h,
-                        bgcolor: "#fff",
-                        border: form.header.modal ? "2px solid #000" : "none",
-                        boxSizing: "border-box",
-                        overflow: "hidden",
+                <canvas
+                    ref={canvasRef}
+                    width={160}
+                    height={160}
+                    style={{
+                        display: "block",
+                        width: "100%",
+                        height: "100%",
+                        imageRendering: "pixelated",
                     }}
-                >
-                    {form.widgets.map((w, i) => {
-                        switch (w.kind) {
-                            case "title":
-                                return (
-                                    <Box
-                                        key={i}
-                                        sx={{
-                                            position: "absolute",
-                                            fontFamily: "PalmOS, monospace",
-                                            left: 0,
-                                            top: 0,
-                                            width: "100%",
-                                            height: 12,
-                                            bgcolor: "#000080",
-                                            color: "#fff",
-                                            px: "3px",
-                                            display: "flex",
-                                            alignItems: "center",
-                                            fontSize: "13px",
-                                            fontWeight: 700,
-                                            boxSizing: "border-box",
-                                            overflow: "hidden",
-                                            textOverflow: "ellipsis",
-                                            whiteSpace: "nowrap",
-                                        }}
-                                    >
-                                        {w.text}
-                                    </Box>
-                                );
-
-                            case "label": {
-                                const text = w.text.replace(/\r/g, "\n");
-                                const fontSize = w.font === 2 || w.font === 3 ? 13 : 13
-                                const isBold = w.font === 1 || w.font === 3;
-                                const width = estimateTextWidth(text.replace(/\n/g, " "), fontSize);
-                                const x = resolveCoord(w.at.x, width, formBounds.w, width);
-                                const y = resolveCoord(w.at.y, fontSize + 2, formBounds.h, fontSize + 2);
-                                return (
-                                    <Box
-                                        key={i}
-                                        sx={{
-                                            position: "absolute",
-                                            fontFamily: "PalmOS, monospace",
-                                            left: x,
-                                            top: y,
-                                            width,
-                                            color: "#000",
-                                            fontSize: `${fontSize}px`,
-                                            fontWeight: isBold ? 700 : 400,
-                                            lineHeight: `${fontSize - 2.5 }px`,
-                                            whiteSpace: "pre-wrap",
-                                            textOverflow: "ellipsis",
-                                            textAlign: "left",
-                                        }}
-                                    >
-                                        {text}
-                                    </Box>
-                                );
-                            }
-
-                            case "field":
-                                return <PalmField key={i} widget={w} />;
-
-                            case "button":
-                                return (
-                                    <PalmButton
-                                        key={i}
-                                        widget={w}
-                                        formWidth={formBounds.w}
-                                    />
-                                );
-
-                            case "bitmap": {
-                                const node = renderBitmap ? renderBitmap(w.id) : null;
-                                return (
-                                    <Box
-                                        key={i}
-                                        sx={{
-                                            position: "absolute",
-                                            left: w.at.x,
-                                            top: w.at.y,
-                                            width: node ? "auto" : 20,
-                                            height: node ? "auto" : 20,
-                                            opacity: w.hidden ? 0.35 : 1,
-                                            display: "flex",
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                            boxSizing: "border-box",
-                                            overflow: "hidden",
-                                        }}
-                                    >
-                                        {node ?? (
-                                            <Box
-                                                sx={{
-                                                    width: 18,
-                                                    height: 18,
-                                                    border: "1px dashed #000",
-                                                    display: "flex",
-                                                    alignItems: "center",
-                                                    justifyContent: "center",
-                                                    fontSize: "7px",
-                                                    fontWeight: 700,
-                                                    bgcolor: "#f5f5f5",
-                                                }}
-                                            >
-                                                {w.id}
-                                            </Box>
-                                        )}
-                                    </Box>
-                                );
-                            }
-
-                            case "list":
-                                return <PalmList key={i} widget={w} />;
-
-                            case "table":
-                                return <PalmTable key={i} widget={w} />;
-
-                            case "scrollbar":
-                                return <PalmScrollbar key={i} widget={w} />;
-
-                            case "slider":
-                                return <PalmSlider key={i} widget={w} />;
-
-                            case "gadget":
-                                return (
-                                    <Box
-                                        key={i}
-                                        sx={{
-                                            position: "absolute",
-                                            left: w.rect.x,
-                                            top: w.rect.y,
-                                            width: w.rect.w,
-                                            height: w.rect.h,
-                                            border: "1px dashed #000",
-                                            bgcolor: "rgba(0,0,0,0.03)",
-                                            boxSizing: "border-box",
-                                        }}
-                                    />
-                                );
-
-                            case "line":
-                                return (
-                                    <Box
-                                        key={i}
-                                        sx={{
-                                            position: "absolute",
-                                            left: w.rect.x,
-                                            top: w.rect.y,
-                                            width: Math.max(1, w.rect.w),
-                                            height: 1,
-                                            bgcolor: "#000",
-                                        }}
-                                    />
-                                );
-
-                            case "frame":
-                            case "rectangle":
-                                return (
-                                    <Box
-                                        key={i}
-                                        sx={{
-                                            position: "absolute",
-                                            left: w.rect.x,
-                                            top: w.rect.y,
-                                            width: w.rect.w,
-                                            height: w.rect.h,
-                                            border: "1px solid #000",
-                                            boxSizing: "border-box",
-                                        }}
-                                    />
-                                );
-                        }
-                    })}
-                </Box>
+                />
             </Box>
         </Box>
     );
 };
-
 interface PalmAlertVisualizerProps {
     pilrcText: string;
 }
@@ -1406,6 +1436,22 @@ export function PrcExplorerPanel({
             setSelectedRecord(null);
             setOpenTypes({});
         }
+        // 3. Create a new image object
+        const img = new Image();
+
+        // 4. Set the source to trigger the download
+        img.src = fontSpritesheet;
+
+        // 5. Wait for it to finish loading, then save it to state
+        img.onload = () => {
+            setLoadedFont(img);
+            console.info("Loaded Palm OS Font");
+        };
+
+        // Optional: Handle loading errors so your app doesn't silently fail
+        img.onerror = () => {
+            console.error("Failed to load the retro font spritesheet.");
+        };
     }, [externalDb]);
 
     const activeDb = externalDb ?? localDb;
@@ -1525,6 +1571,8 @@ export function PrcExplorerPanel({
     }, [selectedRecord]);
 
     const selectedBytes = selectedRecord ? toUint8Array(selectedRecord.data) : new Uint8Array();
+
+    const [loadedFont, setLoadedFont] = useState<HTMLImageElement | null>(null);
 
     const toggleTypeOpen = (type: string) =>
         setOpenTypes((prev) => ({ ...prev, [type]: !prev[type] }));
@@ -1683,6 +1731,7 @@ export function PrcExplorerPanel({
                                                             <PalmFormVisualizer
                                                                 pilrcText={selectedTFRM}
                                                                 renderBitmap={handleRenderFormBitmap}
+                                                                fontImage={loadedFont}
                                                             />
                                                         )}
                                                     </Grid2>
