@@ -172,12 +172,12 @@ function fmtCoord(value: number, extent: number, containerExtent: number | undef
 
     // PilRC can resolve CENTER / RIGHT / BOTTOM. We can recover those
     // when the stored coordinates match the resolved result.
-    if (extent > 0 && value === Math.floor((containerExtent - extent) / 2)) {
-        return "CENTER";
-    }
-    if (extent > 0 && value === containerExtent - extent) {
-        return axis === "x" ? "RIGHT" : "BOTTOM";
-    }
+    // if (extent > 0 && value === Math.floor((containerExtent - extent) / 2)) {
+    //     return "CENTER";
+    // }
+    // if (extent > 0 && value === containerExtent - extent) {
+    //     return axis === "x" ? "RIGHT" : "BOTTOM";
+    // }
     return String(value);
 }
 
@@ -257,6 +257,24 @@ export function decodeTFRM(
                     `AT (${l.pos.x} ${l.pos.y})`,
                 ];
                 if (l.font > 0) parts.push(`FONT ${l.font}`);
+                line = parts.join(" ");
+                break;
+            }
+            case 0: {
+                const c = parseControl(reader, obj.offset);
+                const parts = [
+                    `FIELD `,
+                    `ID ${c.id}`,
+                    `AT ${fmtBounds(c.rect, form.bounds)}`,
+                ];
+                if (!c.usable) parts.push("NONUSABLE");
+                if (!c.enabled) parts.push("DISABLED");
+                if (!c.visible) parts.push("HIDDEN");
+                if (c.on) parts.push("ON");
+                if (!c.leftAnchor) parts.push("RIGHTANCHOR");
+                if (c.frame === 0) parts.push("NOFRAME");
+                else if (c.frame === 2) parts.push("BOLDFRAME");
+                else if (c.frame === 3) parts.push("RECTFRAME");
                 line = parts.join(" ");
                 break;
             }

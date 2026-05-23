@@ -138,7 +138,7 @@ export async function measurePalmOSText(
     return {width: maxWidth, height};
 }
 
-export const PalmFormVisualizer = ({pilrcText, renderBitmap, fontImage}: PalmFormVisualizerProps) => {
+export const PalmFormVisualizer = ({pilrcText, renderBitmap}: PalmFormVisualizerProps) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     const form = useMemo(() => {
@@ -185,16 +185,22 @@ export const PalmFormVisualizer = ({pilrcText, renderBitmap, fontImage}: PalmFor
             ctx.fillStyle = "#fff";
             ctx.fillRect(formBounds.x, formBounds.y, formBounds.w, formBounds.h);
 
-            const drawDottedLine = (x: number, y: number, w: number) => {
+            const drawDottedLine = (x: number, y: number, w: number, h: number) => {
                 ctx.beginPath();
                 ctx.strokeStyle = "#000";
                 ctx.lineWidth = 1;
                 ctx.setLineDash([1, 1]);
-                ctx.moveTo(x, y + 0.5);
-                ctx.lineTo(x + w, y + 0.5);
+
+                const step = 11;
+                for (let offset = step; offset < h; offset += step) {
+                    const currentY = y + offset;
+
+                    ctx.moveTo(x, currentY + 0.5);
+                    ctx.lineTo(x + w, currentY + 0.5);
+                }
+
                 ctx.stroke();
                 ctx.setLineDash([]);
-                console.log("dotted");
             };
 
             const drawButtonRect = (x: number, y: number, w: number, h: number) => {
@@ -309,9 +315,12 @@ export const PalmFormVisualizer = ({pilrcText, renderBitmap, fontImage}: PalmFor
                         break;
 
                     case "field": {
-                        // Assuming fields have an x, y, and w property
-                        const fw = w.rect?.w || w.rect?.w || 50;
-                        drawDottedLine(xOffset + w.rect?.x, yOffset + w.rect?.y + 11, fw);
+                        const bx = xOffset + w.rect?.x;
+                        const by = yOffset + w.rect?.y;
+                        const bw = w.rect?.w || 30;
+                        const bh = w.rect?.h || 12;
+                        drawDottedLine(bx, by, bw, bh);
+
                         break;
                     }
 
@@ -362,7 +371,7 @@ export const PalmFormVisualizer = ({pilrcText, renderBitmap, fontImage}: PalmFor
         };
 
         render();
-    }, [form, renderBitmap, fontImage, formBounds]);
+    }, [form, renderBitmap, formBounds]);
 
     return (
         <Grid2 container spacing={2}>
