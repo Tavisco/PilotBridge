@@ -8,8 +8,7 @@ import {
     Collapse,
     Paper,
     Divider,
-    Button,
-    Stack
+    Button
 } from "@mui/material";
 import Grid2 from "@mui/material/Grid2";
 import ExpandLess from "@mui/icons-material/ExpandLess";
@@ -334,7 +333,7 @@ export function PrcExplorerPanel({
                                                             color="textSecondary">
                                                     String Decoder:
                                                 </Typography>
-                                                <PalmStringVisualizer selectedTSTR={selectedTSTR} />
+                                                <PalmStringVisualizer selectedTSTR={selectedTSTR}/>
                                             </Box>
                                         ) : selectedRecord.entry.type === "tSTL" ? (
                                             /* String table decoder */
@@ -343,7 +342,7 @@ export function PrcExplorerPanel({
                                                             color="textSecondary">
                                                     String Table Decoder:
                                                 </Typography>
-                                                <PalmStringTableVisualizer selectedTSTL={selectedTSTL} />
+                                                <PalmStringTableVisualizer selectedTSTL={selectedTSTL}/>
                                             </Box>
                                         ) : selectedRecord.entry.type === "Talt" ? (
                                             /* Alert resource decoder */
@@ -352,33 +351,8 @@ export function PrcExplorerPanel({
                                                             color="textSecondary">
                                                     PilRC Alert Decoder:
                                                 </Typography>
-                                                <Grid2 container spacing={2}>
-                                                    <Grid2 size={{xs: 12, md: 6}}>
-                                                        <Paper
-                                                            variant="outlined"
-                                                            sx={{
-                                                                p: 2,
-                                                                bgcolor: "#fafafa",
-                                                                borderRadius: 1,
-                                                                fontFamily: "monospace",
-                                                                whiteSpace: "pre-wrap",
-                                                                wordBreak: "break-word",
-                                                                maxHeight: 320,
-                                                                overflowY: "auto",
-                                                                fontSize: "10px"
-                                                            }}
-                                                        >
-                                                            {selectedAlert || "Could not decompile this Talt resource."}
-                                                        </Paper>
-                                                    </Grid2>
-                                                    <Grid2 size={{xs: 12, md: 6}}>
-                                                        {selectedAlert && (
-                                                            <PalmAlertVisualizer
-                                                                pilrcText={selectedAlert}
-                                                            />
-                                                        )}
-                                                    </Grid2>
-                                                </Grid2>
+                                                <PalmAlertVisualizer pilrcText={selectedAlert}
+                                                />
                                             </Box>
                                         ) : selectedRecord.entry.type === "MENU" || selectedRecord.entry.type === "MBAR" ? (
                                             <Box>
@@ -386,29 +360,9 @@ export function PrcExplorerPanel({
                                                             color="textSecondary">
                                                     PilRC Menu Decoder:
                                                 </Typography>
-                                                <Grid2 container spacing={2}>
-                                                    <Grid2 size={{xs: 12, md: 6}}>
-                                                        <Paper
-                                                            variant="outlined"
-                                                            sx={{
-                                                                p: 2,
-                                                                bgcolor: "#fafafa",
-                                                                borderRadius: 1,
-                                                                fontFamily: "monospace",
-                                                                whiteSpace: "pre-wrap",
-                                                                wordBreak: "break-word",
-                                                                maxHeight: 320,
-                                                                overflowY: "auto",
-                                                                fontSize: "9px"
-                                                            }}
-                                                        >
-                                                            {selectedMBAR || "Could not decompile this menu resource."}
-                                                        </Paper>
-                                                    </Grid2>
-                                                    <Grid2 size={{xs: 12, md: 6}}>
-                                                        {selectedMBAR && <PalmMenuVisualizer pilrcText={selectedMBAR}/>}
-                                                    </Grid2>
-                                                </Grid2>
+
+                                                            <PalmMenuVisualizer pilrcText={selectedMBAR}/>
+
                                             </Box>
                                         ) : (
                                             <Typography variant="body2" color="textSecondary"

@@ -1,12 +1,10 @@
 import {useMemo, useEffect, useRef} from "react";
-import {
-    Box, Paper,
-
-} from "@mui/material";
+import { Box } from "@mui/material";
 
 import {loadPalmOSFont, PalmFont, PalmGlyph} from "../../utils/yaff-font.ts";
 import {AtToken, parseFormHeader, parseWidgets} from "../../utils/pilrc-parser.ts";
 import Grid2 from "@mui/material/Grid2";
+import {PilrcTextVisualizer} from "./PilrcTextVisualizer.tsx";
 
 export interface PalmFormVisualizerProps {
     pilrcText: string;
@@ -315,22 +313,7 @@ export const PalmFormVisualizer = ({pilrcText, renderBitmap, fontImage}: PalmFor
     return (
         <Grid2 container spacing={2}>
             <Grid2 size={{ xs: 12, md: 6 }}>
-                <Paper
-                    variant="outlined"
-                    sx={{
-                        p: 2,
-                        bgcolor: "#fafafa",
-                        borderRadius: 1,
-                        fontFamily: "monospace",
-                        whiteSpace: "pre-wrap",
-                        wordBreak: "break-word",
-                        maxHeight: 320,
-                        overflowY: "auto",
-                        fontSize: "7px",
-                    }}
-                >
-                    {pilrcText || "Could not decompile this tFRM resource."}
-                </Paper>
+                <PilrcTextVisualizer pilrcText={pilrcText} />
             </Grid2>
 
             <Grid2 size={{ xs: 12, md: 6 }}>
