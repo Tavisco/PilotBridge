@@ -296,6 +296,24 @@ export function decodeTFRM(
                 line = parts.join(" ");
                 break;
             }
+            case 2: {
+                const c = parseControl(reader, obj.offset);
+                const parts = [
+                    `LIST "${escapeQuotedText(c.text)}"`,
+                    `ID ${c.id}`,
+                    `AT ${fmtBounds(c.rect, form.bounds)}`,
+                ];
+                if (!c.usable) parts.push("NONUSABLE");
+                if (!c.enabled) parts.push("DISABLED");
+                if (!c.visible) parts.push("HIDDEN");
+                if (c.on) parts.push("ON");
+                if (!c.leftAnchor) parts.push("RIGHTANCHOR");
+                if (c.frame === 0) parts.push("NOFRAME");
+                else if (c.frame === 2) parts.push("BOLDFRAME");
+                else if (c.frame === 3) parts.push("RECTFRAME");
+                line = parts.join(" ");
+                break;
+            }
             case 4: {
                 const bm = parseFormBitmap(reader, obj.offset);
                 line = `FORMBITMAP AT (${bm.pos.x} ${bm.pos.y}) BITMAP ${bm.rscID}`;

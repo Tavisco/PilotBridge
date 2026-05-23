@@ -36,6 +36,7 @@ import {PalmAlertVisualizer} from "../components/form-visualizer/PalmAlertVisual
 import PalmBitmapVisualizer from "../components/form-visualizer/PalmBitmapVisualizer.tsx";
 import {PalmStringVisualizer} from "../components/form-visualizer/PalmStringVisualizer.tsx";
 import {PalmStringTableVisualizer} from "../components/form-visualizer/PalmStringTableVisualizer.tsx";
+import SaveIcon from "@mui/icons-material/Save";
 
 export interface PrcExplorerPanelProps {
     /** Database to inspect (embedding case). If omitted, only upload is available. */
@@ -111,6 +112,7 @@ export function PrcExplorerPanel({
                 const parsed = header.attributes.resDB
                     ? RawPrcDatabase.from(fileBuffer)
                     : RawPdbDatabase.from(fileBuffer);
+                console.log(parsed);
                 setLocalDb(parsed);
                 setSelectedRecord(null);
                 setOpenTypes({});
@@ -179,6 +181,27 @@ export function PrcExplorerPanel({
         const resId = selectedRecord.entry.resourceId || "UNKNOWN_ID";
         return decodeMBAR(selectedRecord.data, resId);
     }, [selectedRecord]);
+
+    const handleDownloadRecord = () => {
+        if (!selectedRecord || selectedBytes.length === 0) return;
+
+        // Create a Blob from the Uint8Array
+        const blob = new Blob([selectedBytes], { type: "application/octet-stream" });
+        const url = URL.createObjectURL(blob);
+
+        // Create a temporary anchor element to trigger the download
+        const a = document.createElement("a");
+        a.href = url;
+
+        // Generate a file name based on Type and ID
+        const fileName = `${selectedRecord.entry.type}_${selectedRecord.entry.resourceId ?? selectedRecord.entry.localChunkId}.bin`;
+        a.download = fileName;
+
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
 
     const selectedBytes = selectedRecord ? toUint8Array(selectedRecord.data) : new Uint8Array();
 
@@ -252,10 +275,14 @@ export function PrcExplorerPanel({
                                                 <List dense component="div" disablePadding sx={{pl: 3}}>
                                                     {records.map((rec) => {
                                                         const isSelected = selectedRecord === rec;
-                                                        const resIdHex = `0x${rec.entry.resourceId.toString(16).padStart(4, "0")}`;
+                                                        let resIdHex = `0x0`;
+                                                        if (rec.entry.resourceId) {
+                                                            resIdHex = `0x${rec.entry.resourceId.toString(16).padStart(4, "0")}`;
+                                                        }
+
                                                         return (
                                                             <ListItemButton
-                                                                key={`${type}-${rec.entry.resourceId}`}
+                                                                key={`${type}-${rec.entry.resourceId? rec.entry.resourceId : rec.entry.localChunkId}`}
                                                                 selected={isSelected}
                                                                 onClick={() => setSelectedRecord(rec)}
                                                                 sx={{py: 0.2}}
@@ -263,7 +290,7 @@ export function PrcExplorerPanel({
                                                                 <InsertDriveFileIcon fontSize="small"
                                                                                      sx={{mr: 1, color: "#757575"}}/>
                                                                 <ListItemText
-                                                                    primary={`${rec.entry.resourceId} (${resIdHex})`}
+                                                                    primary={`${rec.entry.resourceId? rec.entry.resourceId : rec.entry.localChunkId} (${resIdHex})`}
                                                                     primaryTypographyProps={{style: {fontFamily: "monospace"}}}
                                                                 />
                                                             </ListItemButton>
@@ -291,17 +318,31 @@ export function PrcExplorerPanel({
                         >
                             {selectedRecord ? (
                                 <Box>
-                                    <Typography variant="subtitle2" color="textSecondary"
-                                                sx={{fontFamily: "monospace"}}>
-                                        Type: <strong>{selectedRecord.entry.type}</strong> |
-                                        ID: <strong>{selectedRecord.entry.resourceId}</strong>
-                                    </Typography>
-                                    <Typography variant="body2" color="textSecondary"
-                                                sx={{fontFamily: "monospace", mb: 1}}>
-                                        Resource Size: {selectedBytes.length} bytes
-                                        {selectedRecord.entry.localChunkId !== undefined &&
-                                            ` | Chunk Offset: 0x${selectedRecord.entry.localChunkId.toString(16).toUpperCase()}`}
-                                    </Typography>
+                                    <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+                                        <Box>
+                                            <Typography variant="subtitle2" color="textSecondary"
+                                                        sx={{fontFamily: "monospace"}}>
+                                                Type: <strong>{selectedRecord.entry.type}</strong> |
+                                                ID: <strong>{selectedRecord.entry.resourceId}</strong>
+                                            </Typography>
+                                            <Typography variant="body2" color="textSecondary"
+                                                        sx={{fontFamily: "monospace", mb: 1}}>
+                                                Resource Size: {selectedBytes.length} bytes
+                                                {selectedRecord.entry.localChunkId !== undefined &&
+                                                    ` | Chunk Offset: 0x${selectedRecord.entry.localChunkId.toString(16).toUpperCase()}`}
+                                            </Typography>
+                                        </Box>
+
+                                        {/* --- NEW DOWNLOAD BUTTON --- */}
+                                        <Button
+                                            variant="outlined"
+                                            size="small"
+                                            onClick={handleDownloadRecord}
+                                            startIcon={<SaveIcon />} // Optional: Un-comment if you imported a download icon
+                                        >
+                                            Download
+                                        </Button>
+                                    </Box>
 
                                     <Divider sx={{my: 1.5}}/>
 

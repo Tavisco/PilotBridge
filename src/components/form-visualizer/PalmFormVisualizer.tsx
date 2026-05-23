@@ -355,7 +355,7 @@ export const PalmFormVisualizer = ({pilrcText, renderBitmap}: PalmFormVisualizer
                     case "scrollbar":
                     case "slider":
                         ctx.strokeStyle = "#000";
-                        ctx.lineWidth = 1;
+                        ctx.lineWidth = 2;
                         ctx.strokeRect(xOffset + w.rect.x, yOffset + w.rect.y, w.rect.w, w.rect.h);
                         break;
 
