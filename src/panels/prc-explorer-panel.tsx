@@ -34,6 +34,7 @@ import {
 import {PalmFormVisualizer} from "../components/form-visualizer/PalmFormVisualizer.tsx";
 import {PalmMenuVisualizer} from "../components/form-visualizer/PalmMenuVisualizer.tsx";
 import {PalmAlertVisualizer} from "../components/form-visualizer/PalmAlertVisualizer.tsx";
+import PalmBitmapVisualizer from "../components/form-visualizer/PalmBitmapVisualizer.tsx";
 
 export interface PrcExplorerPanelProps {
     /** Database to inspect (embedding case). If omitted, only upload is available. */
@@ -292,24 +293,7 @@ export function PrcExplorerPanel({
                                                 <Typography variant="caption" display="block" gutterBottom color="textSecondary">
                                                     Bitmap Visualizer:
                                                 </Typography>
-                                                <Stack spacing={2}>
-                                                    {selectedBitmaps.length > 0 ? (
-                                                        selectedBitmaps.map((bmp, index) => (
-                                                            <Box key={index}>
-                                                                <Typography variant="body2" sx={{ fontFamily: "monospace", mb: 1 }}>
-                                                                    {bmp.width} x {bmp.height}, {bmp.bpp} bpp, {bmp.density} dpi
-                                                                </Typography>
-                                                                <Box p={2} border="1px dashed #ccc" width="fit-content" borderRadius={1} bgcolor="#f0f0f0">
-                                                                    <PalmIcon bitmap={bmp} />
-                                                                </Box>
-                                                            </Box>
-                                                        ))
-                                                    ) : (
-                                                        <Typography variant="body2" color="textSecondary">
-                                                            No decodable bitmap variants found in this resource.
-                                                        </Typography>
-                                                    )}
-                                                </Stack>
+                                                <PalmBitmapVisualizer bitmaps={selectedBitmaps} />
                                             </Box>
                                         ) : selectedRecord.entry.type === "tFRM" ? (
                                             /* MODIFIED: Embedded Visualizer into the tFRM section */
