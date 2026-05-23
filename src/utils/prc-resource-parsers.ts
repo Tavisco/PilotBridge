@@ -193,9 +193,7 @@ function parseFormHeader68K(reader: PalmBinaryReader) {
             h: reader.i16be(0x10),
         },
         frameWidth: reader.u8(0x1F),
-
-        modal: (windowFlags & 0x0200) !== 0,
-
+        modal: (windowFlags & 0x2000) !== 0,
         defaultBtnId: reader.u16be(0x38),
         helpRscId: reader.u16be(0x3A),
         menuRscId: reader.u16be(0x3C),

@@ -194,21 +194,45 @@ export const PalmFormVisualizer = ({pilrcText, renderBitmap, fontImage}: PalmFor
                 ctx.lineTo(x + w, y + 0.5);
                 ctx.stroke();
                 ctx.setLineDash([]);
+                console.log("dotted");
             };
 
             const drawButtonRect = (x: number, y: number, w: number, h: number) => {
                 ctx.fillStyle = "#000";
-                ctx.fillRect(x + 1, y, w - 2, 1);
-                ctx.fillRect(x + 1, y + h - 1, w - 2, 1);
-                ctx.fillRect(x, y + 1, 1, h - 2);
-                ctx.fillRect(x + w - 1, y + 1, 1, h - 2);
+
+                // 1. Draw main edges
+                ctx.fillRect(x + 2, y, w - 4, 1);             // Top
+                ctx.fillRect(x + 2, y + h - 1, w - 4, 1);     // Bottom
+                ctx.fillRect(x, y + 2, 1, h - 4);             // Left
+                ctx.fillRect(x + w - 1, y + 2, 1, h - 4);     // Right
+
+                // 2. Draw the transitional corner pixels
+                ctx.fillRect(x + 1, y + 1, 1, 1);             // Top-Left
+                ctx.fillRect(x + w - 2, y + 1, 1, 1);         // Top-Right
+                ctx.fillRect(x + 1, y + h - 2, 1, 1);         // Bottom-Left
+                ctx.fillRect(x + w - 2, y + h - 2, 1, 1);     // Bottom-Right
             };
 
             if (form.header.modal) {
-                ctx.strokeStyle = "#00007f";
-                ctx.lineWidth = 2;
-                // drawButtonRect(formBounds.x - 1, formBounds.y - 1, formBounds.w + 2, formBounds.h + 2)
-                ctx.strokeRect(formBounds.x - 1, formBounds.y - 1, formBounds.w + 2, formBounds.h + 2);
+                ctx.fillStyle = "#00007f";
+
+                // Expand the boundary by 2 pixels in all directions to wrap the white background
+                const bx = formBounds.x - 2;
+                const by = formBounds.y - 2;
+                const bw = formBounds.w + 4;
+                const bh = formBounds.h + 4;
+
+                // Top edge (2px thick, indented 1px on left and right for rounding)
+                ctx.fillRect(bx + 1, by, bw - 2, 2);
+
+                // Bottom edge (2px thick, indented 1px on left and right for rounding)
+                ctx.fillRect(bx + 1, by + bh - 2, bw - 2, 2);
+
+                // Left edge (2px thick, indented 1px on top and bottom for rounding)
+                ctx.fillRect(bx, by + 1, 2, bh - 2);
+
+                // Right edge (2px thick, indented 1px on top and bottom for rounding)
+                ctx.fillRect(bx + bw - 2, by + 1, 2, bh - 2);
             }
 
             // --- Draw shapes & text (no bitmaps – they are handled in React) ---
@@ -218,20 +242,50 @@ export const PalmFormVisualizer = ({pilrcText, renderBitmap, fontImage}: PalmFor
 
                 switch (w.kind) {
                     case "title": {
-                        ctx.fillStyle = "#00007f";
-                        ctx.fillRect(xOffset, yOffset, formBounds.w, 12);
-
                         const titleText = w.text.replace(/\r/g, "\n");
                         const scale = 1;
                         const textWidth = await measureTextWidth(titleText, scale);
                         const textHeight = font.lineHeight * scale; // 11px
 
-                        // Center horizontally in the title bar
-                        const textX = Math.round(xOffset + (formBounds.w - textWidth) / 2);
-                        // Center vertically within the 12px bar
-                        const textTopY = Math.round(yOffset + (12 - textHeight) / 2);
+                        const padding = 4; // Horizontal space inside the pill
+                        const isModal = form.header.modal;
+                        const pillHeight = 12;
 
-                        await drawBitmapText(titleText, textX, textTopY, true, true);
+                        ctx.fillStyle = "#00007f";
+
+                        if (isModal) {
+                            // Modal: Fill the interior space perfectly flush against the inner edge of the borders.
+                            // The outer 2px boundary already handles the rounded corners.
+                            ctx.fillRect(xOffset, yOffset, formBounds.w, pillHeight);
+
+                            // Draw the separator line at the bottom of the title bar
+                            ctx.fillRect(xOffset, yOffset + pillHeight - 1, formBounds.w, 2);
+
+                            // Position text: Centered
+                            const textX = Math.round(xOffset + (formBounds.w - textWidth) / 2);
+                            const textTopY = Math.round(yOffset + (pillHeight - textHeight) / 2);
+
+                            await drawBitmapText(titleText, textX, textTopY, true, true);
+                        } else {
+                            // Regular Form: The title wraps tightly and creates its own rounded corners.
+                            const pillWidth = textWidth + (padding * 2);
+
+                            // Middle horizontal band (omitting top & bottom pixel rows)
+                            ctx.fillRect(xOffset, yOffset + 1, pillWidth, pillHeight - 2);
+                            // Top row (omitting left & right corner pixels)
+                            ctx.fillRect(xOffset + 1, yOffset, pillWidth - 2, 1);
+                            // Bottom row (omitting left & right corner pixels)
+                            ctx.fillRect(xOffset + 1, yOffset + pillHeight - 1, pillWidth - 2, 1);
+
+                            // 2px horizontal line extending to the right screen edge
+                            ctx.fillRect(xOffset, yOffset + pillHeight - 1, formBounds.w, 2);
+
+                            // Position text: Left-aligned with padding
+                            const textX = Math.round(xOffset + padding);
+                            const textTopY = Math.round(yOffset + (pillHeight - textHeight) / 2);
+
+                            await drawBitmapText(titleText, textX, textTopY, true, true);
+                        }
                         break;
                     }
 
@@ -276,7 +330,7 @@ export const PalmFormVisualizer = ({pilrcText, renderBitmap, fontImage}: PalmFor
 
                         // Center and round to integer pixels to avoid sub‑pixel blur
                         const textX = Math.round(bx + (bw - textWidth) / 2);
-                        const textTopY = Math.round(by + (bh - textHeight) / 2);
+                        const textTopY = Math.round(by + (bh - textHeight) / 2) - 1;
 
                         await drawBitmapText(rawText, textX, textTopY, false);
                         break;
