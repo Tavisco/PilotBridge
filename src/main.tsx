@@ -8,7 +8,6 @@ import { App } from './app';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { prefsStore } from './prefs-store';
 import { observer } from "mobx-react"; // Import observer
-import './assets/custom_fonts.css'
 
 export const AppWrapper = observer(function AppWrapper() {
     const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)');
