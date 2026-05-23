@@ -36,6 +36,7 @@ import {PalmMenuVisualizer} from "../components/form-visualizer/PalmMenuVisualiz
 import {PalmAlertVisualizer} from "../components/form-visualizer/PalmAlertVisualizer.tsx";
 import PalmBitmapVisualizer from "../components/form-visualizer/PalmBitmapVisualizer.tsx";
 import {PalmStringVisualizer} from "../components/form-visualizer/PalmStringVisualizer.tsx";
+import {PalmStringTableVisualizer} from "../components/form-visualizer/PalmStringTableVisualizer.tsx";
 
 export interface PrcExplorerPanelProps {
     /** Database to inspect (embedding case). If omitted, only upload is available. */
@@ -342,62 +343,7 @@ export function PrcExplorerPanel({
                                                             color="textSecondary">
                                                     String Table Decoder:
                                                 </Typography>
-                                                <Paper
-                                                    variant="outlined"
-                                                    sx={{
-                                                        bgcolor: "#fafafa",
-                                                        borderRadius: 1,
-                                                        overflow: "hidden",
-                                                    }}
-                                                >
-                                                    {selectedTSTL.length > 0 ? (
-                                                        <Box component="ul" sx={{listStyle: "none", m: 0, p: 0}}>
-                                                            {selectedTSTL.map((str, index) => (
-                                                                <Box
-                                                                    component="li"
-                                                                    key={index}
-                                                                    sx={{
-                                                                        display: "flex",
-                                                                        px: 2,
-                                                                        py: 1,
-                                                                        borderBottom: index < selectedTSTL.length - 1 ? "1px solid #e0e0e0" : "none",
-                                                                        fontFamily: "monospace",
-                                                                        "&:hover": {bgcolor: "#f0f0f0"}, // Nice hover effect per row
-                                                                    }}
-                                                                >
-                                                                    <Typography
-                                                                        component="span"
-                                                                        sx={{
-                                                                            fontFamily: "inherit",
-                                                                            color: "text.disabled",
-                                                                            mr: 2,
-                                                                            userSelect: "none",
-                                                                        }}
-                                                                    >
-                                                                        {String(index).padStart(4, "0")}
-                                                                    </Typography>
-                                                                    <Typography
-                                                                        component="span"
-                                                                        sx={{
-                                                                            fontFamily: "inherit",
-                                                                            color: "text.primary",
-                                                                            wordBreak: "break-word",
-                                                                            whiteSpace: "pre-wrap",
-                                                                        }}
-                                                                    >
-                                                                        {str}
-                                                                    </Typography>
-                                                                </Box>
-                                                            ))}
-                                                        </Box>
-                                                    ) : (
-                                                        <Typography
-                                                            sx={{p: 2, fontFamily: "monospace", color: "text.disabled"}}
-                                                        >
-                                                            EMPTY STRING TABLE
-                                                        </Typography>
-                                                    )}
-                                                </Paper>
+                                                <PalmStringTableVisualizer selectedTSTL={selectedTSTL} />
                                             </Box>
                                         ) : selectedRecord.entry.type === "Talt" ? (
                                             /* Alert resource decoder */
