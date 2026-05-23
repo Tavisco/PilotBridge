@@ -35,8 +35,10 @@ import {
 interface PalmFormVisualizerProps {
     pilrcText: string;
     renderBitmap?: (id: number) => React.ReactNode;
-}type AtToken = number | "CENTER" | "RIGHT" | "BOTTOM";
-type RectLike = { x: AtToken; y: AtToken; w: number; h: number };
+}
+
+type RectLike = { x: number; y: number; w: number; h: number };
+type AtToken = number | "CENTER" | "RIGHT" | "BOTTOM";
 
 type ParsedFormHeader = {
     id: number | string;
@@ -54,7 +56,7 @@ type ParsedWidget =
     | { kind: "label"; text: string; id?: number; at: { x: AtToken; y: AtToken }; font?: number }
     | { kind: "field"; id?: number; rect: RectLike; maxChars?: number; editable: boolean; singleLine: boolean }
     | { kind: "button"; id?: number; text: string; rect: RectLike; hidden: boolean; defaultBtn: boolean; frame?: string }
-    | { kind: "bitmap"; id: number; at: { x: AtToken; y: AtToken }; hidden: boolean }
+    | { kind: "bitmap"; id: number; at: { x: number; y: number }; hidden: boolean }
     | { kind: "list"; id?: number; rect: RectLike; items: string[]; visibleItems?: number; search?: boolean }
     | { kind: "table"; id?: number; rect: RectLike; numColumns?: number; numRows?: number }
     | { kind: "scrollbar"; id?: number; rect: RectLike; value?: number; minValue?: number; maxValue?: number; pageSize?: number }
@@ -126,8 +128,8 @@ function parseFormHeader(text: string): ParsedFormHeader {
         ? (() => {
             const parts = headerMatch[2].trim().split(/\s+/);
             return {
-                x: parseNumberOrWord(parts[0]) || 0,
-                y: parseNumberOrWord(parts[1]) || 0,
+                x: Number(parts[0]) || 0,
+                y: Number(parts[1]) || 0,
                 w: Number(parts[2]) || 160,
                 h: Number(parts[3]) || 160,
             };
@@ -167,6 +169,10 @@ function parseWidgets(pilrcText: string, form: ParsedFormHeader): ParsedWidget[]
         .map((line) => line.trim())
         .filter(Boolean);
 
+    // Helper to get numeric x,y from AtToken (crude fallback to 0 for tokens)
+    const getNumericPos = (token: AtToken): number =>
+        typeof token === "number" ? token : 0;
+
     for (const line of lines) {
         if (/^FORM\b/i.test(line) || /^BEGIN$/i.test(line) || /^END$/i.test(line)) continue;
         if (/^FRAME$/i.test(line)) continue;
@@ -175,7 +181,7 @@ function parseWidgets(pilrcText: string, form: ParsedFormHeader): ParsedWidget[]
         if (/^DEFAULTBTNID\b/i.test(line)) continue;
         if (/^HELPID\b/i.test(line)) continue;
         if (/^MENUID\b/i.test(line)) continue;
-        if (/^OBJECT\b/i.test(line)) continue;
+        if (/^OBJECT\b/i.test(line)) continue; // ignore frmFieldObj etc.
 
         if (/^TITLE\s+"/i.test(line)) {
             const title = line.match(/^TITLE\s+"((?:\\.|[^"])*)"/i)?.[1] ?? "";
@@ -216,7 +222,12 @@ function parseWidgets(pilrcText: string, form: ParsedFormHeader): ParsedWidget[]
                 kind: "button",
                 id: id != null ? Number(id) : undefined,
                 text: text.replace(/\\r/g, "\r").replace(/\\n/g, "\n"),
-                rect: { x: at.x, y: at.y, w: at.w ?? 0, h: at.h ?? 0 },
+                rect: {
+                    x: getNumericPos(at.x),
+                    y: getNumericPos(at.y),
+                    w: at.w ?? 0,
+                    h: at.h ?? 0,
+                },
                 hidden,
                 defaultBtn,
                 frame,
@@ -232,7 +243,12 @@ function parseWidgets(pilrcText: string, form: ParsedFormHeader): ParsedWidget[]
             widgets.push({
                 kind: "field",
                 id: id != null ? Number(id) : undefined,
-                rect: { x: at.x, y: at.y, w: at.w ?? 0, h: at.h ?? 0 },
+                rect: {
+                    x: getNumericPos(at.x),
+                    y: getNumericPos(at.y),
+                    w: at.w ?? 0,
+                    h: at.h ?? 0,
+                },
                 maxChars: maxChars != null ? Number(maxChars) : undefined,
                 editable: !/\bNONEDITABLE\b/i.test(line),
                 singleLine: /\bSINGLELINE\b/i.test(line) || !/\bMULTIPLELINES\b/i.test(line),
@@ -247,7 +263,7 @@ function parseWidgets(pilrcText: string, form: ParsedFormHeader): ParsedWidget[]
             widgets.push({
                 kind: "bitmap",
                 id: Number(id),
-                at: { x: at.x, y: at.y },
+                at: { x: getNumericPos(at.x), y: getNumericPos(at.y) },
                 hidden: /\bHIDDEN\b/i.test(line) || /\bNONUSABLE\b/i.test(line),
             });
             continue;
@@ -264,7 +280,12 @@ function parseWidgets(pilrcText: string, form: ParsedFormHeader): ParsedWidget[]
             widgets.push({
                 kind: "list",
                 id: id != null ? Number(id) : undefined,
-                rect: { x: at.x, y: at.y, w: at.w ?? 0, h: at.h ?? 0 },
+                rect: {
+                    x: getNumericPos(at.x),
+                    y: getNumericPos(at.y),
+                    w: at.w ?? 0,
+                    h: at.h ?? 0,
+                },
                 items,
                 visibleItems: visibleItems != null ? Number(visibleItems) : undefined,
                 search: /\bSEARCH\b/i.test(line),
@@ -281,7 +302,12 @@ function parseWidgets(pilrcText: string, form: ParsedFormHeader): ParsedWidget[]
             widgets.push({
                 kind: "table",
                 id: id != null ? Number(id) : undefined,
-                rect: { x: at.x, y: at.y, w: at.w ?? 0, h: at.h ?? 0 },
+                rect: {
+                    x: getNumericPos(at.x),
+                    y: getNumericPos(at.y),
+                    w: at.w ?? 0,
+                    h: at.h ?? 0,
+                },
                 numColumns: numColumns != null ? Number(numColumns) : undefined,
                 numRows: numRows != null ? Number(numRows) : undefined,
             });
@@ -293,12 +319,27 @@ function parseWidgets(pilrcText: string, form: ParsedFormHeader): ParsedWidget[]
             if (!at) continue;
             widgets.push({
                 kind: "scrollbar",
-                id: line.match(/\bID\s+(\d+)/i)?.[1] ? Number(line.match(/\bID\s+(\d+)/i)![1]) : undefined,
-                rect: { x: at.x, y: at.y, w: at.w ?? 0, h: at.h ?? 0 },
-                value: line.match(/\bVALUE\s+(-?\d+)/i)?.[1] ? Number(line.match(/\bVALUE\s+(-?\d+)/i)![1]) : undefined,
-                minValue: line.match(/\bMINVALUE\s+(-?\d+)/i)?.[1] ? Number(line.match(/\bMINVALUE\s+(-?\d+)/i)![1]) : undefined,
-                maxValue: line.match(/\bMAXVALUE\s+(-?\d+)/i)?.[1] ? Number(line.match(/\bMAXVALUE\s+(-?\d+)/i)![1]) : undefined,
-                pageSize: line.match(/\bPAGESIZE\s+(-?\d+)/i)?.[1] ? Number(line.match(/\bPAGESIZE\s+(-?\d+)/i)![1]) : undefined,
+                id: line.match(/\bID\s+(\d+)/i)?.[1]
+                    ? Number(line.match(/\bID\s+(\d+)/i)![1])
+                    : undefined,
+                rect: {
+                    x: getNumericPos(at.x),
+                    y: getNumericPos(at.y),
+                    w: at.w ?? 0,
+                    h: at.h ?? 0,
+                },
+                value: line.match(/\bVALUE\s+(-?\d+)/i)?.[1]
+                    ? Number(line.match(/\bVALUE\s+(-?\d+)/i)![1])
+                    : undefined,
+                minValue: line.match(/\bMINVALUE\s+(-?\d+)/i)?.[1]
+                    ? Number(line.match(/\bMINVALUE\s+(-?\d+)/i)![1])
+                    : undefined,
+                maxValue: line.match(/\bMAXVALUE\s+(-?\d+)/i)?.[1]
+                    ? Number(line.match(/\bMAXVALUE\s+(-?\d+)/i)![1])
+                    : undefined,
+                pageSize: line.match(/\bPAGESIZE\s+(-?\d+)/i)?.[1]
+                    ? Number(line.match(/\bPAGESIZE\s+(-?\d+)/i)![1])
+                    : undefined,
             });
             continue;
         }
@@ -308,14 +349,31 @@ function parseWidgets(pilrcText: string, form: ParsedFormHeader): ParsedWidget[]
             if (!at) continue;
             widgets.push({
                 kind: "slider",
-                id: line.match(/\bID\s+(\d+)/i)?.[1] ? Number(line.match(/\bID\s+(\d+)/i)![1]) : undefined,
-                rect: { x: at.x, y: at.y, w: at.w ?? 0, h: at.h ?? 0 },
-                minValue: line.match(/\bMINVALUE\s+(-?\d+)/i)?.[1] ? Number(line.match(/\bMINVALUE\s+(-?\d+)/i)![1]) : undefined,
-                maxValue: line.match(/\bMAXVALUE\s+(-?\d+)/i)?.[1] ? Number(line.match(/\bMAXVALUE\s+(-?\d+)/i)![1]) : undefined,
-                value: line.match(/\bVALUE\s+(-?\d+)/i)?.[1] ? Number(line.match(/\bVALUE\s+(-?\d+)/i)![1]) : undefined,
+                id: line.match(/\bID\s+(\d+)/i)?.[1]
+                    ? Number(line.match(/\bID\s+(\d+)/i)![1])
+                    : undefined,
+                rect: {
+                    x: getNumericPos(at.x),
+                    y: getNumericPos(at.y),
+                    w: at.w ?? 0,
+                    h: at.h ?? 0,
+                },
+                minValue: line.match(/\bMINVALUE\s+(-?\d+)/i)?.[1]
+                    ? Number(line.match(/\bMINVALUE\s+(-?\d+)/i)![1])
+                    : undefined,
+                maxValue: line.match(/\bMAXVALUE\s+(-?\d+)/i)?.[1]
+                    ? Number(line.match(/\bMAXVALUE\s+(-?\d+)/i)![1])
+                    : undefined,
+                value: line.match(/\bVALUE\s+(-?\d+)/i)?.[1]
+                    ? Number(line.match(/\bVALUE\s+(-?\d+)/i)![1])
+                    : undefined,
                 vertical: /\bVERTICAL\b/i.test(line),
-                thumbId: line.match(/\bTHUMBID\s+(\d+)/i)?.[1] ? Number(line.match(/\bTHUMBID\s+(\d+)/i)![1]) : undefined,
-                backgroundId: line.match(/\bBACKGROUNDID\s+(\d+)/i)?.[1] ? Number(line.match(/\bBACKGROUNDID\s+(\d+)/i)![1]) : undefined,
+                thumbId: line.match(/\bTHUMBID\s+(\d+)/i)?.[1]
+                    ? Number(line.match(/\bTHUMBID\s+(\d+)/i)![1])
+                    : undefined,
+                backgroundId: line.match(/\bBACKGROUNDID\s+(\d+)/i)?.[1]
+                    ? Number(line.match(/\bBACKGROUNDID\s+(\d+)/i)![1])
+                    : undefined,
                 feedback: /\bFEEDBACK\b/i.test(line),
             });
             continue;
@@ -326,8 +384,15 @@ function parseWidgets(pilrcText: string, form: ParsedFormHeader): ParsedWidget[]
             if (!at) continue;
             widgets.push({
                 kind: "gadget",
-                id: line.match(/\bID\s+(\d+)/i)?.[1] ? Number(line.match(/\bID\s+(\d+)/i)![1]) : undefined,
-                rect: { x: at.x, y: at.y, w: at.w ?? 0, h: at.h ?? 0 },
+                id: line.match(/\bID\s+(\d+)/i)?.[1]
+                    ? Number(line.match(/\bID\s+(\d+)/i)![1])
+                    : undefined,
+                rect: {
+                    x: getNumericPos(at.x),
+                    y: getNumericPos(at.y),
+                    w: at.w ?? 0,
+                    h: at.h ?? 0,
+                },
                 extended: /\bEXTENDED\b/i.test(line),
             });
             continue;
@@ -337,7 +402,15 @@ function parseWidgets(pilrcText: string, form: ParsedFormHeader): ParsedWidget[]
             const at = parseAtSpec(line);
             if (!at) continue;
             const kind = line.split(/\s+/)[0].toLowerCase() as "line" | "frame" | "rectangle";
-            widgets.push({ kind, rect: { x: at.x, y: at.y, w: at.w ?? 0, h: at.h ?? 0 } });
+            widgets.push({
+                kind,
+                rect: {
+                    x: getNumericPos(at.x),
+                    y: getNumericPos(at.y),
+                    w: at.w ?? 0,
+                    h: at.h ?? 0,
+                },
+            });
             continue;
         }
     }
@@ -345,91 +418,145 @@ function parseWidgets(pilrcText: string, form: ParsedFormHeader): ParsedWidget[]
     return widgets;
 }
 
-// ── UI Components ─────────────────────────────────────────────────────────────
-
-type WidgetProps<T> = { widget: T; formWidth: number; formHeight: number };
-
-function PalmButton({ widget, formWidth, formHeight }: WidgetProps<Extract<ParsedWidget, { kind: "button" }>>) {
+function PalmButton({
+                        widget,
+                        formWidth,
+                    }: {
+    widget: Extract<ParsedWidget, { kind: "button" }>;
+    formWidth: number;
+}) {
     const width = widget.rect.w || Math.max(26, estimateTextWidth(widget.text, 9) + 10);
     const height = widget.rect.h || 12;
-    const left = resolveCoord(widget.rect.x, width, formWidth);
-    const top = resolveCoord(widget.rect.y, height, formHeight);
+    const left = widget.rect.x; // now absolute
+    const top = widget.rect.y;
 
     const frameStyle =
         widget.frame === "NOFRAME"
-            ? { border: "none", borderRadius: 0 }
+            ? { border: "none", boxShadow: "none", borderRadius: 0 }
             : widget.frame === "BOLDFRAME"
-                ? { border: "2px solid #000", borderRadius: "4px" }
+                ? { border: "2px solid #000" }
                 : widget.frame === "RECTFRAME"
                     ? { borderRadius: 0 }
-                    : { borderRadius: "4px" }; // Standard Palm Button curve
+                    : {}; // default round rect with 1px border
 
     return (
-        <Box sx={{
-            position: "absolute", left, top, width, height, boxSizing: "border-box",
-            border: "1px solid #000",
-            bgcolor: widget.defaultBtn ? "#000" : "#fff",
-            color: widget.defaultBtn ? "#fff" : "#000",
-            opacity: widget.hidden ? 0.35 : 1,
-            display: "flex", alignItems: "center", justifyContent: "center", px: "3px",
-            fontSize: "9px", fontWeight: 700, lineHeight: "10px",
-            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-            fontFamily: "PalmOS, monospace",
-            ...frameStyle,
-        }}>
+        <Box
+            sx={{
+                position: "absolute",
+                left,
+                top,
+                width,
+                height,
+                boxSizing: "border-box",
+                border: "1px solid #000",
+                borderRadius: "3px",
+                bgcolor: widget.defaultBtn ? "#000" : "#e5e5e5",
+                color: widget.defaultBtn ? "#fff" : "#000",
+                boxShadow: widget.defaultBtn ? "none" : "1px 1px 0 #000",
+                opacity: widget.hidden ? 0.35 : 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                px: "3px",
+                fontSize: "9px",
+                fontWeight: 700,
+                lineHeight: "10px",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                fontFamily: "PalmOS, monospace",
+                ...frameStyle,
+            }}
+        >
             {widget.text}
         </Box>
     );
 }
 
-function PalmField({ widget, formWidth, formHeight }: WidgetProps<Extract<ParsedWidget, { kind: "field" }>>) {
-    const w = widget.rect.w || 60;
-    const h = widget.rect.h || 12;
-    const left = resolveCoord(widget.rect.x, w, formWidth);
-    const top = resolveCoord(widget.rect.y, h, formHeight);
-
+function PalmField({ widget }: { widget: Extract<ParsedWidget, { kind: "field" }> }) {
     return (
-        <Box sx={{
-            position: "absolute", left, top, width: w, height: h, boxSizing: "border-box",
-            bgcolor: "transparent", overflow: "hidden",
-        }}>
-            <Box sx={{
-                position: "absolute", left: 0, right: 0, bottom: 1,
-                borderBottom: "1px dotted #000", // Standard PilRC Field Underline
-                opacity: widget.editable ? 1 : 0.4,
-            }} />
-            <Box sx={{
-                position: "absolute", inset: 0, py: "1px",
-                fontSize: "9px", fontFamily: "PalmOS, monospace", lineHeight: "10px", color: "#000",
-                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-            }}>
+        <Box
+            sx={{
+                position: "absolute",
+                left: widget.rect.x,
+                top: widget.rect.y,
+                width: widget.rect.w,
+                height: widget.rect.h,
+                boxSizing: "border-box",
+                border: "1px solid #000",
+                bgcolor: "#fff",
+                borderRadius: "2px",
+                overflow: "hidden",
+            }}
+        >
+            <Box
+                sx={{
+                    position: "absolute",
+                    left: 2,
+                    right: 2,
+                    bottom: 2,
+                    borderBottom: "1px dotted #000",
+                    opacity: widget.editable ? 1 : 0.55,
+                }}
+            />
+            <Box
+                sx={{
+                    position: "absolute",
+                    inset: 0,
+                    px: "2px",
+                    py: "1px",
+                    fontSize: "9px",
+                    fontFamily: "PalmOS, monospace",
+                    lineHeight: "10px",
+                    color: "#000",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                }}
+            >
                 {widget.maxChars ? `Field (${widget.maxChars})` : "Field"}
             </Box>
         </Box>
     );
 }
 
-function PalmList({ widget, formWidth, formHeight }: WidgetProps<Extract<ParsedWidget, { kind: "list" }>>) {
+function PalmList({ widget }: { widget: Extract<ParsedWidget, { kind: "list" }> }) {
     const visible = Math.max(1, widget.visibleItems ?? Math.min(widget.items.length || 1, 4));
-    const h = widget.rect.h || visible * 11 + 2;
-    const left = resolveCoord(widget.rect.x, widget.rect.w, formWidth);
-    const top = resolveCoord(widget.rect.y, h, formHeight);
-
     return (
-        <Box sx={{
-            position: "absolute", left, top, width: widget.rect.w, height: h,
-            boxSizing: "border-box", border: "1px solid #000", bgcolor: "#fff", overflow: "hidden",
-        }}>
+        <Box
+            sx={{
+                position: "absolute",
+                left: widget.rect.x,
+                top: widget.rect.y,
+                width: widget.rect.w,
+                height: widget.rect.h || visible * 11 + 2,
+                boxSizing: "border-box",
+                border: "1px solid #000",
+                bgcolor: "#fff",
+                overflow: "hidden",
+            }}
+        >
             {Array.from({ length: visible }).map((_, i) => {
                 const text = widget.items[i] ?? "";
                 return (
-                    <Box key={i} sx={{
-                        height: 11, px: "2px", display: "flex", alignItems: "center",
-                        bgcolor: i === 0 ? "#000" : "transparent",
-                        color: i === 0 ? "#fff" : "#000",
-                        fontSize: "9px", fontFamily: "PalmOS, monospace", lineHeight: "10px",
-                        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                    }}>
+                    <Box
+                        key={i}
+                        sx={{
+                            height: 11,
+                            px: "2px",
+                            display: "flex",
+                            alignItems: "center",
+                            borderBottom: i < visible - 1 ? "1px solid #ddd" : "none",
+                            bgcolor: i === 0 ? "#000" : "transparent",
+                            color: i === 0 ? "#fff" : "#000",
+                            fontSize: "8px",
+                            fontFamily: "PalmOS, monospace",
+                            lineHeight: "10px",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                        }}
+                    >
                         {text || (widget.search ? "Search…" : "Item")}
                     </Box>
                 );
@@ -438,30 +565,42 @@ function PalmList({ widget, formWidth, formHeight }: WidgetProps<Extract<ParsedW
     );
 }
 
-function PalmTable({ widget, formWidth, formHeight }: WidgetProps<Extract<ParsedWidget, { kind: "table" }>>) {
+function PalmTable({ widget }: { widget: Extract<ParsedWidget, { kind: "table" }> }) {
     const cols = Math.max(1, widget.numColumns ?? 2);
     const rows = Math.max(1, widget.numRows ?? 3);
     const cellW = Math.max(12, Math.floor((widget.rect.w || 60) / cols));
     const cellH = 10;
-    const h = widget.rect.h || rows * cellH + 2;
-    const left = resolveCoord(widget.rect.x, widget.rect.w, formWidth);
-    const top = resolveCoord(widget.rect.y, h, formHeight);
 
     return (
-        <Box sx={{
-            position: "absolute", left, top, width: widget.rect.w, height: h,
-            boxSizing: "border-box", border: "1px solid #000", bgcolor: "#fff", overflow: "hidden",
-        }}>
+        <Box
+            sx={{
+                position: "absolute",
+                left: widget.rect.x,
+                top: widget.rect.y,
+                width: widget.rect.w,
+                height: widget.rect.h || rows * cellH + 2,
+                boxSizing: "border-box",
+                border: "1px solid #000",
+                bgcolor: "#fff",
+                overflow: "hidden",
+            }}
+        >
             {Array.from({ length: rows }).map((_, r) => (
                 <Box key={r} sx={{ display: "flex", height: cellH }}>
                     {Array.from({ length: cols }).map((__, c) => (
-                        <Box key={c} sx={{
-                            width: cellW,
-                            borderRight: c < cols - 1 ? "1px solid #000" : "none",
-                            borderBottom: r < rows - 1 ? "1px solid #000" : "none",
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            fontSize: "7px", fontFamily: "PalmOS, monospace",
-                        }}>
+                        <Box
+                            key={c}
+                            sx={{
+                                width: cellW,
+                                borderRight: c < cols - 1 ? "1px solid #000" : "none",
+                                borderBottom: r < rows - 1 ? "1px solid #000" : "none",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: "7px",
+                                fontFamily: "PalmOS, monospace",
+                            }}
+                        >
                             &nbsp;
                         </Box>
                     ))}
@@ -471,12 +610,9 @@ function PalmTable({ widget, formWidth, formHeight }: WidgetProps<Extract<Parsed
     );
 }
 
-function PalmScrollbar({ widget, formWidth, formHeight }: WidgetProps<Extract<ParsedWidget, { kind: "scrollbar" }>>) {
+function PalmScrollbar({ widget }: { widget: Extract<ParsedWidget, { kind: "scrollbar" }> }) {
     const w = widget.rect.w || 7;
     const h = widget.rect.h || 48;
-    const left = resolveCoord(widget.rect.x, w, formWidth);
-    const top = resolveCoord(widget.rect.y, h, formHeight);
-
     const min = widget.minValue ?? 0;
     const max = widget.maxValue ?? 100;
     const value = widget.value ?? min;
@@ -485,20 +621,33 @@ function PalmScrollbar({ widget, formWidth, formHeight }: WidgetProps<Extract<Pa
     const thumbY = Math.floor((h - thumbH - 2) * pct) + 1;
 
     return (
-        <Box sx={{
-            position: "absolute", left, top, width: w, height: h,
-            border: "1px solid #000", bgcolor: "#fff", boxSizing: "border-box",
-        }}>
-            <Box sx={{
-                position: "absolute", left: 1, right: 1, top: thumbY, height: thumbH, bgcolor: "#000",
-            }} />
+        <Box
+            sx={{
+                position: "absolute",
+                left: widget.rect.x,
+                top: widget.rect.y,
+                width: w,
+                height: h,
+                border: "1px solid #000",
+                bgcolor: "#fff",
+                boxSizing: "border-box",
+            }}
+        >
+            <Box
+                sx={{
+                    position: "absolute",
+                    left: 1,
+                    right: 1,
+                    top: thumbY,
+                    height: thumbH,
+                    bgcolor: "#000",
+                }}
+            />
         </Box>
     );
 }
 
-function PalmSlider({ widget, formWidth, formHeight }: WidgetProps<Extract<ParsedWidget, { kind: "slider" }>>) {
-    const left = resolveCoord(widget.rect.x, widget.rect.w, formWidth);
-    const top = resolveCoord(widget.rect.y, widget.rect.h, formHeight);
+function PalmSlider({ widget }: { widget: Extract<ParsedWidget, { kind: "slider" }> }) {
     const vertical = widget.vertical || widget.rect.h > widget.rect.w;
     const min = widget.minValue ?? 0;
     const max = widget.maxValue ?? 100;
@@ -513,28 +662,53 @@ function PalmSlider({ widget, formWidth, formHeight }: WidgetProps<Extract<Parse
     const thumbPos = railInset + Math.floor(travel * pct);
 
     return (
-        <Box sx={{
-            position: "absolute", left, top, width: widget.rect.w, height: widget.rect.h,
-            border: "1px solid #000", bgcolor: "#fff", boxSizing: "border-box", overflow: "hidden",
-        }}>
-            <Box sx={{
+        <Box
+            sx={{
                 position: "absolute",
-                ...(vertical
-                    ? { left: "50%", top: railInset, bottom: railInset, width: 1, transform: "translateX(-50%)", bgcolor: "#000" }
-                    : { top: "50%", left: railInset, right: railInset, height: 1, transform: "translateY(-50%)", bgcolor: "#000" }),
-            }} />
-            <Box sx={{
-                position: "absolute",
-                ...(vertical
-                    ? { left: 1, top: thumbPos, width: widget.rect.w - 2, height: thumbSize }
-                    : { top: 1, left: thumbPos, width: thumbSize, height: widget.rect.h - 2 }),
-                bgcolor: "#000",
-            }} />
+                left: widget.rect.x,
+                top: widget.rect.y,
+                width: widget.rect.w,
+                height: widget.rect.h,
+                border: "1px solid #000",
+                bgcolor: "#fff",
+                boxSizing: "border-box",
+                overflow: "hidden",
+            }}
+        >
+            <Box
+                sx={{
+                    position: "absolute",
+                    ...(vertical
+                        ? {
+                            left: "50%",
+                            top: railInset,
+                            bottom: railInset,
+                            width: 1,
+                            transform: "translateX(-50%)",
+                            bgcolor: "#000",
+                        }
+                        : {
+                            top: "50%",
+                            left: railInset,
+                            right: railInset,
+                            height: 1,
+                            transform: "translateY(-50%)",
+                            bgcolor: "#000",
+                        }),
+                }}
+            />
+            <Box
+                sx={{
+                    position: "absolute",
+                    ...(vertical
+                        ? { left: 1, top: thumbPos, width: widget.rect.w - 2, height: thumbSize }
+                        : { top: 1, left: thumbPos, width: thumbSize, height: widget.rect.h - 2 }),
+                    bgcolor: "#000",
+                }}
+            />
         </Box>
     );
 }
-
-// ── Main Renderer ─────────────────────────────────────────────────────────────
 
 export const PalmFormVisualizer = ({ pilrcText, renderBitmap }: PalmFormVisualizerProps) => {
     const form = useMemo(() => {
@@ -545,126 +719,224 @@ export const PalmFormVisualizer = ({ pilrcText, renderBitmap }: PalmFormVisualiz
 
     const outerW = 320;
     const outerH = 320;
-    const fw = form.header.bounds.w;
-    const fh = form.header.bounds.h;
     const formBounds = form.header.bounds;
 
     return (
-        <Box sx={{
-            width: outerW, height: outerH, display: "flex", justifyContent: "center", alignItems: "center",
-            bgcolor: "#e0e0e0", borderRadius: 1,
-        }}>
-            <Box sx={{
-                width: 160, height: 160, backgroundColor: "#fff", position: "relative",
-                transform: "scale(2)", transformOrigin: "center center",
-                border: form.header.modal ? "2px solid #000" : "1px solid #999",
-                boxShadow: "0px 4px 12px rgba(0,0,0,0.15)",
-                fontFamily: "sans-serif", overflow: "hidden", boxSizing: "border-box",
-                backgroundImage: "radial-gradient(#d3d3d3 1px, transparent 1px)", backgroundSize: "4px 4px",
-            }}>
-                <Box sx={{
-                    position: "absolute",
-                    left: resolveCoord(formBounds.x, fw, 160),
-                    top: resolveCoord(formBounds.y, fh, 160),
-                    width: fw, height: fh, bgcolor: "#fff",
-                    border: form.header.modal ? "2px solid #000" : "none",
-                    boxSizing: "border-box", overflow: "hidden",
-                }}>
+        <Box
+            sx={{
+                width: outerW,
+                height: outerH,
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                bgcolor: "#e0e0e0",
+                borderRadius: 1,
+            }}
+        >
+            <Box
+                sx={{
+                    width: 160,
+                    height: 160,
+                    backgroundColor: "#fff",
+                    position: "relative",
+                    transform: "scale(2)",
+                    transformOrigin: "center center",
+                    border: form.header.modal ? "2px solid #000" : "1px solid #999",
+                    boxShadow: "0px 4px 12px rgba(0,0,0,0.15)",
+                    fontFamily: "sans-serif",
+                    overflow: "hidden",
+                    boxSizing: "border-box",
+                    // Subtle dot grid (classic Palm look)
+                    backgroundImage: "radial-gradient(#d3d3d3 1px, transparent 1px)",
+                    backgroundSize: "4px 4px",
+                }}
+            >
+                {/* Form content area */}
+                <Box
+                    sx={{
+                        position: "absolute",
+                        left: formBounds.x,
+                        top: formBounds.y,
+                        width: formBounds.w,
+                        height: formBounds.h,
+                        bgcolor: "#fff",
+                        border: form.header.modal ? "2px solid #000" : "none",
+                        boxSizing: "border-box",
+                        overflow: "hidden",
+                    }}
+                >
                     {form.widgets.map((w, i) => {
                         switch (w.kind) {
                             case "title":
                                 return (
-                                    <Box key={i} sx={{
-                                        position: "absolute", left: 0, top: 0, width: "100%", height: 14,
-                                        bgcolor: "#000", color: "#fff", px: "3px",
-                                        display: "flex", alignItems: "center",
-                                        fontFamily: "PalmOS, monospace", fontSize: "12px", fontWeight: 700,
-                                        boxSizing: "border-box", overflow: "hidden",
-                                        textOverflow: "ellipsis", whiteSpace: "nowrap",
-                                    }}>
+                                    <Box
+                                        key={i}
+                                        sx={{
+                                            position: "absolute",
+                                            fontFamily: "PalmOS, monospace",
+                                            left: 0,
+                                            top: 0,
+                                            width: "100%",
+                                            height: 12,
+                                            bgcolor: "#000080",
+                                            color: "#fff",
+                                            px: "3px",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            fontSize: "13px",
+                                            fontWeight: 700,
+                                            boxSizing: "border-box",
+                                            overflow: "hidden",
+                                            textOverflow: "ellipsis",
+                                            whiteSpace: "nowrap",
+                                        }}
+                                    >
                                         {w.text}
                                     </Box>
                                 );
 
                             case "label": {
                                 const text = w.text.replace(/\r/g, "\n");
-                                const fontSize = (w.font === 2 || w.font === 7) ? 12 : 9;
-                                const isBold = w.font === 1 || w.font === 7;
+                                const fontSize = w.font === 2 || w.font === 3 ? 13 : 13
+                                const isBold = w.font === 1 || w.font === 3;
                                 const width = estimateTextWidth(text.replace(/\n/g, " "), fontSize);
-                                const x = resolveCoord(w.at.x, width, fw, width);
-                                const y = resolveCoord(w.at.y, fontSize + 2, fh, fontSize + 2);
+                                const x = resolveCoord(w.at.x, width, formBounds.w, width);
+                                const y = resolveCoord(w.at.y, fontSize + 2, formBounds.h, fontSize + 2);
                                 return (
-                                    <Box key={i} sx={{
-                                        position: "absolute", left: x, top: y, width, color: "#000",
-                                        fontFamily: "PalmOS, monospace", fontSize: `${fontSize}px`,
-                                        fontWeight: isBold ? 700 : 400, lineHeight: `${fontSize + 1}px`,
-                                        whiteSpace: "pre-wrap", textOverflow: "ellipsis", textAlign: "left",
-                                    }}>
+                                    <Box
+                                        key={i}
+                                        sx={{
+                                            position: "absolute",
+                                            fontFamily: "PalmOS, monospace",
+                                            left: x,
+                                            top: y,
+                                            width,
+                                            color: "#000",
+                                            fontSize: `${fontSize}px`,
+                                            fontWeight: isBold ? 700 : 400,
+                                            lineHeight: `${fontSize - 2.5 }px`,
+                                            whiteSpace: "pre-wrap",
+                                            textOverflow: "ellipsis",
+                                            textAlign: "left",
+                                        }}
+                                    >
                                         {text}
                                     </Box>
                                 );
                             }
 
                             case "field":
-                                return <PalmField key={i} widget={w} formWidth={fw} formHeight={fh} />;
-                            case "button":
-                                return <PalmButton key={i} widget={w} formWidth={fw} formHeight={fh} />;
-                            case "list":
-                                return <PalmList key={i} widget={w} formWidth={fw} formHeight={fh} />;
-                            case "table":
-                                return <PalmTable key={i} widget={w} formWidth={fw} formHeight={fh} />;
-                            case "scrollbar":
-                                return <PalmScrollbar key={i} widget={w} formWidth={fw} formHeight={fh} />;
-                            case "slider":
-                                return <PalmSlider key={i} widget={w} formWidth={fw} formHeight={fh} />;
+                                return <PalmField key={i} widget={w} />;
 
-                            case "bitmap":
+                            case "button":
                                 return (
-                                    <Box key={i} sx={{
-                                        position: "absolute",
-                                        left: resolveCoord(w.at.x, 0, fw),
-                                        top: resolveCoord(w.at.y, 0, fh)
-                                    }}>
-                                        {renderBitmap ? renderBitmap(w.id) : <Box sx={{ width: 16, height: 16, border: '1px solid #aaa', bgcolor: '#ccc' }} />}
+                                    <PalmButton
+                                        key={i}
+                                        widget={w}
+                                        formWidth={formBounds.w}
+                                    />
+                                );
+
+                            case "bitmap": {
+                                const node = renderBitmap ? renderBitmap(w.id) : null;
+                                return (
+                                    <Box
+                                        key={i}
+                                        sx={{
+                                            position: "absolute",
+                                            left: w.at.x,
+                                            top: w.at.y,
+                                            width: node ? "auto" : 20,
+                                            height: node ? "auto" : 20,
+                                            opacity: w.hidden ? 0.35 : 1,
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            boxSizing: "border-box",
+                                            overflow: "hidden",
+                                        }}
+                                    >
+                                        {node ?? (
+                                            <Box
+                                                sx={{
+                                                    width: 18,
+                                                    height: 18,
+                                                    border: "1px dashed #000",
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                    fontSize: "7px",
+                                                    fontWeight: 700,
+                                                    bgcolor: "#f5f5f5",
+                                                }}
+                                            >
+                                                {w.id}
+                                            </Box>
+                                        )}
                                     </Box>
+                                );
+                            }
+
+                            case "list":
+                                return <PalmList key={i} widget={w} />;
+
+                            case "table":
+                                return <PalmTable key={i} widget={w} />;
+
+                            case "scrollbar":
+                                return <PalmScrollbar key={i} widget={w} />;
+
+                            case "slider":
+                                return <PalmSlider key={i} widget={w} />;
+
+                            case "gadget":
+                                return (
+                                    <Box
+                                        key={i}
+                                        sx={{
+                                            position: "absolute",
+                                            left: w.rect.x,
+                                            top: w.rect.y,
+                                            width: w.rect.w,
+                                            height: w.rect.h,
+                                            border: "1px dashed #000",
+                                            bgcolor: "rgba(0,0,0,0.03)",
+                                            boxSizing: "border-box",
+                                        }}
+                                    />
                                 );
 
                             case "line":
                                 return (
-                                    <Box key={i} sx={{
-                                        position: "absolute",
-                                        left: resolveCoord(w.rect.x, w.rect.w, fw),
-                                        top: resolveCoord(w.rect.y, w.rect.h, fh),
-                                        width: w.rect.w || 1, height: w.rect.h || 1, bgcolor: "#000"
-                                    }} />
+                                    <Box
+                                        key={i}
+                                        sx={{
+                                            position: "absolute",
+                                            left: w.rect.x,
+                                            top: w.rect.y,
+                                            width: Math.max(1, w.rect.w),
+                                            height: 1,
+                                            bgcolor: "#000",
+                                        }}
+                                    />
                                 );
 
                             case "frame":
                             case "rectangle":
                                 return (
-                                    <Box key={i} sx={{
-                                        position: "absolute",
-                                        left: resolveCoord(w.rect.x, w.rect.w, fw),
-                                        top: resolveCoord(w.rect.y, w.rect.h, fh),
-                                        width: w.rect.w, height: w.rect.h,
-                                        border: w.kind === "frame" ? "1px solid #000" : "none",
-                                        bgcolor: w.kind === "rectangle" ? "#000" : "transparent"
-                                    }} />
+                                    <Box
+                                        key={i}
+                                        sx={{
+                                            position: "absolute",
+                                            left: w.rect.x,
+                                            top: w.rect.y,
+                                            width: w.rect.w,
+                                            height: w.rect.h,
+                                            border: "1px solid #000",
+                                            boxSizing: "border-box",
+                                        }}
+                                    />
                                 );
-
-                            case "gadget":
-                                return (
-                                    <Box key={i} sx={{
-                                        position: "absolute",
-                                        left: resolveCoord(w.rect.x, w.rect.w, fw),
-                                        top: resolveCoord(w.rect.y, w.rect.h, fh),
-                                        width: w.rect.w, height: w.rect.h,
-                                        border: "1px dashed #999", bgcolor: "rgba(0,0,0,0.05)"
-                                    }} />
-                                );
-
-                            default:
-                                return null;
                         }
                     })}
                 </Box>
