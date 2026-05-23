@@ -11,7 +11,7 @@ export interface TAIBBitmap {
     height: number;
     rowBytes: number;
     flags: number;
-    pixelSize: number;
+    bpp: number;
     version: number;
     transparentIndex?: number | null;
     compressionType?: number | null;
@@ -33,7 +33,7 @@ export const placeholderBitmap: TAIBBitmap = {
     height: PLACEHOLDER_SIZE,
     rowBytes: 3,
     flags: 0,
-    pixelSize: 1,
+    bpp: 1,
     version: 1,
     transparentIndex: null,
     compressionType: null,
@@ -172,16 +172,17 @@ function unpackPixels(
     return pixels;
 }
 
-function pickDensity(width: number, height: number, flags: number): number {
-    if ((flags & 0x08) !== 0) return 144;
-    if (width >= 33 || height >= 33) return 108;
+function normalizeDensity(raw: number): 72 | 108 | 144 {
+    if (raw === 72 || raw === 108 || raw === 144) return raw;
+    if (raw === 1) return 72;   // PilRC normalizes "1" to single density
+    if (raw === 2) return 144;  // PilRC normalizes "2" to double density
     return 72;
 }
 
 function scoreBitmapForSorting(b: TAIBBitmap): number {
     const densityScore = b.density ?? 72;
     const versionScore = b.version;
-    const pixelSizeScore = b.pixelSize;
+    const pixelSizeScore = b.bpp;
     const areaScore = b.width * b.height;
     return (densityScore * 1_000_000) + (versionScore * 10_000) + (pixelSizeScore * 100) + areaScore;
 }
@@ -221,7 +222,7 @@ function tryParseTAIBAtOffset(
 
     const startOffset = offset;
 
-    const width = dataView.getUint16(offset, false);
+    const width = dataView.getUint16(offset + 0, false);
     const height = dataView.getUint16(offset + 2, false);
     const rowBytes = dataView.getUint16(offset + 4, false);
     const flags = dataView.getUint16(offset + 6, false);
@@ -237,22 +238,72 @@ function tryParseTAIBAtOffset(
     let headerSize = 16;
     let nextOffsetDelta = 0;
 
+    // IMPORTANT:
+    // Density is NOT inferred from dimensions or flags.
+    // PilRC stores it explicitly only in v3 headers.
+    let density: 72 | 108 | 144 = 72;
+
     try {
         if (version === 0) {
+            // BitmapType
+            headerSize = 16;
             nextOffsetDelta = 0;
+            density = 72;
+
         } else if (version === 1) {
+            // BitmapTypeV1
+            if (offset + 12 > dataView.byteLength) return null;
+
+            headerSize = 16;
+
             if (pixelSize === 255) return null;
+
             nextOffsetDelta = dataView.getUint16(offset + 10, false) * 4;
+
+            density = 72;
+
         } else if (version === 2) {
+            // BitmapTypeV2
+            if (offset + 14 > dataView.byteLength) return null;
+
+            headerSize = 16;
+
             nextOffsetDelta = dataView.getUint16(offset + 10, false) * 4;
+
             transparentIndex = dataView.getUint8(offset + 12);
             compressionType = dataView.getUint8(offset + 13);
+
+            density = 72;
+
         } else if (version === 3) {
-            headerSize = Math.max(24, dataView.getUint8(offset + 10));
+            // BitmapTypeV3
+            if (offset + 24 > dataView.byteLength) return null;
+
+            const rawHeaderSize = dataView.getUint8(offset + 10);
+
+            // PilRC emits at least 24-byte v3 headers
+            headerSize = Math.max(24, rawHeaderSize || 24);
+
+            if (offset + headerSize > dataView.byteLength) return null;
+
+            // offset + 11 = pixelFormat
+            // offset + 12 = unused / reserved
+
             compressionType = dataView.getUint8(offset + 13);
+
+            // REAL density field
+            const rawDensity = dataView.getUint16(offset + 14, false);
+            density = normalizeDensity(rawDensity);
+
             const transparentValue = dataView.getUint32(offset + 16, false);
-            transparentIndex = pixelSize <= 8 ? (transparentValue & 0xff) : transparentValue;
+
+            transparentIndex =
+                pixelSize <= 8
+                    ? (transparentValue & 0xff)
+                    : transparentValue;
+
             nextOffsetDelta = dataView.getUint32(offset + 20, false);
+
         } else {
             return null;
         }
@@ -263,9 +314,9 @@ function tryParseTAIBAtOffset(
     const hasColorTable = Boolean(flags & PilHasColorTable);
     const isCompressed = Boolean(flags & PilCompressed);
     const hasTransparency = Boolean(flags & PilTransparent);
-    const density = pickDensity(width, height, flags);
 
     let dataStart = startOffset + headerSize;
+
     let palette: PaletteEntry[] | undefined = undefined;
 
     if (hasColorTable) {
@@ -273,11 +324,14 @@ function tryParseTAIBAtOffset(
 
         const colorCount = dataView.getUint16(dataStart, false);
         dataStart += 2;
+
         palette = [];
 
         for (let i = 0; i < colorCount; i++) {
             if (dataStart + 4 > dataView.byteLength) return null;
-            dataStart++; // internal index / padding byte
+
+            dataStart++; // index / padding byte
+
             palette.push({
                 r: dataView.getUint8(dataStart++),
                 g: dataView.getUint8(dataStart++),
@@ -286,11 +340,14 @@ function tryParseTAIBAtOffset(
         }
     }
 
-    let cbDst = nextOffsetDelta > 0
-        ? nextOffsetDelta - (dataStart - startOffset)
-        : dataView.byteLength - dataStart;
+    let cbDst =
+        nextOffsetDelta > 0
+            ? nextOffsetDelta - (dataStart - startOffset)
+            : dataView.byteLength - dataStart;
 
-    if (cbDst < 0) cbDst = dataView.byteLength - dataStart;
+    if (cbDst < 0) {
+        cbDst = dataView.byteLength - dataStart;
+    }
 
     let pixelsPacked: Uint8Array | null = null;
 
@@ -299,16 +356,20 @@ function tryParseTAIBAtOffset(
         let compressedStart = dataStart;
 
         if (version === 3) {
+            // v3 compressed streams may be prefixed with a 32-bit length
             if (dataStart + 4 <= dataView.byteLength) {
                 const len = dataView.getUint32(dataStart, false);
+
                 if (len >= 4 && len <= cbDst) {
                     compressedBytesLen = len - 4;
                     compressedStart = dataStart + 4;
                 }
             }
         } else {
+            // older formats may use 16-bit length
             if (dataStart + 2 <= dataView.byteLength) {
                 const len = dataView.getUint16(dataStart, false);
+
                 if (len >= 2 && len <= cbDst) {
                     compressedBytesLen = len - 2;
                     compressedStart = dataStart + 2;
@@ -316,7 +377,9 @@ function tryParseTAIBAtOffset(
             }
         }
 
-        if (compressedStart + compressedBytesLen > dataView.byteLength) return null;
+        if (compressedStart + compressedBytesLen > dataView.byteLength) {
+            return null;
+        }
 
         const compressed = new Uint8Array(
             resourceBytes.buffer,
@@ -327,30 +390,54 @@ function tryParseTAIBAtOffset(
         const comp = compressionType ?? 0;
 
         if (comp === 0) {
-            pixelsPacked = decompressScanline(compressed, rowBytes, height);
+            pixelsPacked = decompressScanline(
+                compressed,
+                rowBytes,
+                height
+            );
         } else if (comp === 1) {
-            pixelsPacked = decompressRLE(compressed, rowBytes, height);
+            pixelsPacked = decompressRLE(
+                compressed,
+                rowBytes,
+                height
+            );
         } else if (comp === 2) {
-            pixelsPacked = decompressPackBits(compressed, rowBytes, height);
+            pixelsPacked = decompressPackBits(
+                compressed,
+                rowBytes,
+                height
+            );
         } else {
             return null;
         }
+
     } else {
         const dataLen = rowBytes * height;
-        if (dataStart + dataLen <= dataView.byteLength) {
-            pixelsPacked = new Uint8Array(
-                resourceBytes.buffer,
-                resourceBytes.byteOffset + dataStart,
-                dataLen
-            );
+
+        if (dataStart + dataLen > dataView.byteLength) {
+            return null;
         }
+
+        pixelsPacked = new Uint8Array(
+            resourceBytes.buffer,
+            resourceBytes.byteOffset + dataStart,
+            dataLen
+        );
     }
 
     if (!pixelsPacked) return null;
 
-    const pixels = unpackPixels(pixelsPacked, pixelSize, width, height, rowBytes);
+    const pixels = unpackPixels(
+        pixelsPacked,
+        pixelSize,
+        width,
+        height,
+        rowBytes
+    );
 
-    if (pixels.length !== width * height) return null;
+    if (pixels.length !== width * height) {
+        return null;
+    }
 
     return {
         bitmap: {
@@ -358,51 +445,84 @@ function tryParseTAIBAtOffset(
             height,
             rowBytes,
             flags,
-            pixelSize,
+            bpp: pixelSize,
             version,
-            transparentIndex: hasTransparency ? transparentIndex : null,
+            transparentIndex: hasTransparency
+                ? transparentIndex
+                : null,
             compressionType,
             density,
             pixels,
             palette
         },
-        endOffset: nextOffsetDelta > 0 ? startOffset + nextOffsetDelta : dataView.byteLength
+
+        endOffset:
+            nextOffsetDelta > 0
+                ? startOffset + nextOffsetDelta
+                : dataView.byteLength
     };
+}
+
+const PILRC_FAKE_BITMAP_HEADER_SIZE = 16;
+
+function isPilrcFakeBitmapHeader(resourceBytes: Uint8Array, offset: number): boolean {
+    if (offset + PILRC_FAKE_BITMAP_HEADER_SIZE > resourceBytes.byteLength) return false;
+
+    const dv = new DataView(
+        resourceBytes.buffer,
+        resourceBytes.byteOffset,
+        resourceBytes.byteLength
+    );
+
+    const width = dv.getUint16(offset + 0, false);
+    const height = dv.getUint16(offset + 2, false);
+    const rowBytes = dv.getUint16(offset + 4, false);
+    const flags = dv.getUint16(offset + 6, false);
+    const pixelSize = dv.getUint8(offset + 8);
+    const version = dv.getUint8(offset + 9);
+
+    // PilRC writes a zeroed RCBitmap header and only patches:
+    // pixelsize = 255, version = 0x01 (68K) or 0x81 (LE32).
+    return (
+        width === 0 &&
+        height === 0 &&
+        rowBytes === 0 &&
+        flags === 0 &&
+        pixelSize === 255 &&
+        (version === 0x01 || version === 0x81)
+    );
 }
 
 function collectBitmapsByScanning(resourceBytes: Uint8Array): TAIBBitmap[] {
     const candidates: Array<{ offset: number; bitmap: TAIBBitmap }> = [];
-    const seenOffsets = new Set<number>();
+    const visited = new Set<number>();
 
-    // First try the old linear interpretation from offset 0.
-    let linearOffset = 0;
-    let loopGuard = 0;
-    while (linearOffset + 10 <= resourceBytes.byteLength && loopGuard++ < 1000) {
-        const parsed = tryParseTAIBAtOffset(resourceBytes, linearOffset);
-        if (!parsed) break;
+    let offset = 0;
+    let guard = 0;
 
-        if (!seenOffsets.has(linearOffset)) {
-            seenOffsets.add(linearOffset);
-            candidates.push({ offset: linearOffset, bitmap: parsed.bitmap });
+    while (offset + 10 <= resourceBytes.byteLength && guard++ < 2048) {
+        if (visited.has(offset)) break;
+        visited.add(offset);
+
+        // PilRC inserts a fake header before the first non-single-density bitmap.
+        if (isPilrcFakeBitmapHeader(resourceBytes, offset)) {
+            offset += PILRC_FAKE_BITMAP_HEADER_SIZE;
+            continue;
         }
 
-        if (parsed.endOffset <= linearOffset || parsed.endOffset > resourceBytes.byteLength) {
+        const parsed = tryParseTAIBAtOffset(resourceBytes, offset);
+        if (!parsed) {
+            // Deterministic PilRC resources should not require probing other offsets.
             break;
         }
 
-        // If the next block doesn't look sane, let the full scan pick up the rest.
-        linearOffset = parsed.endOffset;
-    }
-
-    // Full fallback scan: this is what recovers the missing density/depth variants.
-    for (let offset = 0; offset + 10 <= resourceBytes.byteLength; offset += 2) {
-        if (seenOffsets.has(offset)) continue;
-
-        const parsed = tryParseTAIBAtOffset(resourceBytes, offset);
-        if (!parsed) continue;
-
-        seenOffsets.add(offset);
         candidates.push({ offset, bitmap: parsed.bitmap });
+
+        if (parsed.endOffset <= offset || parsed.endOffset > resourceBytes.byteLength) {
+            break;
+        }
+
+        offset = parsed.endOffset;
     }
 
     candidates.sort((a, b) => {
@@ -412,7 +532,6 @@ function collectBitmapsByScanning(resourceBytes: Uint8Array): TAIBBitmap[] {
         return a.offset - b.offset;
     });
 
-    // Deduplicate by visible identity, preferring the earliest occurrence.
     const out: TAIBBitmap[] = [];
     const seenKeys = new Set<string>();
 
@@ -421,7 +540,7 @@ function collectBitmapsByScanning(resourceBytes: Uint8Array): TAIBBitmap[] {
             c.bitmap.width,
             c.bitmap.height,
             c.bitmap.rowBytes,
-            c.bitmap.pixelSize,
+            c.bitmap.bpp,
             c.bitmap.version,
             c.bitmap.density ?? 72,
             c.bitmap.flags
@@ -435,10 +554,12 @@ function collectBitmapsByScanning(resourceBytes: Uint8Array): TAIBBitmap[] {
     return out.sort((a, b) => {
         const da = a.density ?? 72;
         const db = b.density ?? 72;
-        if (db !== da) return db - da;
-        if (b.version !== a.version) return b.version - a.version;
-        if (b.pixelSize !== a.pixelSize) return b.pixelSize - a.pixelSize;
-        return (b.width * b.height) - (a.width * a.height);
+        if (da !== db) return da - db;
+
+        if (a.version !== b.version) return a.version - b.version;
+        if (a.bpp !== b.bpp) return a.bpp - b.bpp;
+
+        return (a.width * a.height) - (b.width * b.height);
     });
 }
 

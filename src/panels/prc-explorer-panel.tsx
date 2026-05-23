@@ -636,7 +636,10 @@ export function PrcExplorerPanel({
         const decodedBitmaps = extractAllTAIBBitmapsFromResource(toUint8Array(imageRecord.data));
 
         // Forms usually use the first bitmap variant
-        const targetBmp = decodedBitmaps[0];
+        const targetBmp = decodedBitmaps
+            .filter((x) => x.density == 72)
+            .sort((a,b)=> a < b ? 1:-1)
+            .at(0);
 
         if (!targetBmp) {
             return null;
@@ -851,7 +854,7 @@ export function PrcExplorerPanel({
                                                         selectedBitmaps.map((bmp, index) => (
                                                             <Box key={index}>
                                                                 <Typography variant="body2" sx={{ fontFamily: "monospace", mb: 1 }}>
-                                                                    {bmp.width} x {bmp.height}, {bmp.pixelSize} bpp, {bmp.density} dpi
+                                                                    {bmp.width} x {bmp.height}, {bmp.bpp} bpp, {bmp.density} dpi
                                                                 </Typography>
                                                                 <Box p={2} border="1px dashed #ccc" width="fit-content" borderRadius={1} bgcolor="#f0f0f0">
                                                                     <PalmIcon bitmap={bmp} />
@@ -879,6 +882,7 @@ export function PrcExplorerPanel({
                                                                 p: 2, bgcolor: "#fafafa", borderRadius: 1,
                                                                 fontFamily: "monospace", whiteSpace: "pre-wrap",
                                                                 wordBreak: "break-word", maxHeight: 320, overflowY: "auto",
+                                                                fontSize: "7px"
                                                             }}
                                                         >
                                                             {selectedTFRM || "Could not decompile this tFRM resource."}

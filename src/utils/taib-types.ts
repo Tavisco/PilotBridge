@@ -9,7 +9,7 @@ export interface TAIBBitmap {
     height: number;
     rowBytes: number;
     flags: number;
-    pixelSize: number;
+    bpp: number;
     version: number;
     transparentIndex?: number | null;
     compressionType?: number | null;

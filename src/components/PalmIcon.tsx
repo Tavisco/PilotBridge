@@ -60,7 +60,7 @@ export const drawTAIBBitmap = (
     const {
         pixels,
         palette,
-        pixelSize = 1,
+        bpp = 1,
         transparentIndex = null
     } = bmp;
 
@@ -117,7 +117,7 @@ export const drawTAIBBitmap = (
     const out = imageData.data;
 
     const maxIndex =
-        Math.max(1, (1 << pixelSize) - 1);
+        Math.max(1, (1 << bpp) - 1);
 
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
@@ -146,7 +146,7 @@ export const drawTAIBBitmap = (
                 g = p.g;
                 b = p.b;
             } else if (
-                pixelSize === 8 &&
+                bpp === 8 &&
                 (!palette || palette.length === 0)
             ) {
                 [r, g, b] =
@@ -154,13 +154,13 @@ export const drawTAIBBitmap = (
             } else {
                 let val = 0;
 
-                if (pixelSize === 1) {
+                if (bpp === 1) {
                     val = idx ? 0 : 255;
-                } else if (pixelSize === 2) {
+                } else if (bpp === 2) {
                     val = Math.round(
                         255 * (1 - idx / 3)
                     );
-                } else if (pixelSize === 4) {
+                } else if (bpp === 4) {
                     val = Math.round(
                         255 * (1 - idx / 15)
                     );

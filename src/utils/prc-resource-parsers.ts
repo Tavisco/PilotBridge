@@ -288,14 +288,6 @@ export function decodeTFRM(
     lines.push(...objectLines);
     lines.push("END");
 
-    const discovered = extractAsciiRuns(bytes, 3);
-    if (discovered.length > 0) {
-        lines.push("", "; discovered strings");
-        for (const s of discovered.slice(0, 128)) {
-            lines.push(`; "${escapeQuotedText(s)}"`);
-        }
-    }
-
     return lines.join("\n");
 }
 
@@ -454,7 +446,6 @@ export function decodeMBAR(
     }
 
     const best = tryDecodeWithAnyVariant(bytes, resourceId);
-    console.log(best);
     if (best) return best;
 
     return `// Invalid MBAR resource: Unable to decode with PilRC layouts`;
