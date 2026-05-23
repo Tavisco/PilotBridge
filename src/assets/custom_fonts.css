@@ -1,0 +1,14 @@
+/* src/index.css */
+
+@font-face {
+    font-family: 'PalmOS';
+    src: url('palm-os.woff') format('woff');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap; /* Encourages quicker loading */
+}
+
+/* Apply it globally or to a specific class */
+body {
+    font-family: 'MyCustomFont', sans-serif;
+}

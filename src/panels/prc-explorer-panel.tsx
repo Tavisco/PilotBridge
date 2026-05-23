@@ -9,7 +9,7 @@ import {
     Paper,
     Divider,
     Button,
-    Stack,
+    Stack, GlobalStyles,
 } from "@mui/material";
 import Grid2 from "@mui/material/Grid2";
 import ExpandLess from "@mui/icons-material/ExpandLess";
@@ -18,7 +18,6 @@ import FolderIcon from "@mui/icons-material/Folder";
 import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
 import FileUploadIcon from "@mui/icons-material/FileUpload";
 import { DatabaseHdrType, RawPdbDatabase, RawPrcDatabase } from "palm-pdb";
-import ImageIcon from '@mui/icons-material/Image';
 import { Panel } from "../panel";
 import { PalmIcon } from "../components/PalmIcon";
 import {
@@ -36,118 +35,637 @@ import {
 interface PalmFormVisualizerProps {
     pilrcText: string;
     renderBitmap?: (id: number) => React.ReactNode;
+}type AtToken = number | "CENTER" | "RIGHT" | "BOTTOM";
+type RectLike = { x: AtToken; y: AtToken; w: number; h: number };
+
+type ParsedFormHeader = {
+    id: number | string;
+    bounds: RectLike;
+    title: string;
+    frame: boolean;
+    modal: boolean;
+    defaultBtnId: number | null;
+    helpId: number | null;
+    menuId: number | null;
+};
+
+type ParsedWidget =
+    | { kind: "title"; text: string }
+    | { kind: "label"; text: string; id?: number; at: { x: AtToken; y: AtToken }; font?: number }
+    | { kind: "field"; id?: number; rect: RectLike; maxChars?: number; editable: boolean; singleLine: boolean }
+    | { kind: "button"; id?: number; text: string; rect: RectLike; hidden: boolean; defaultBtn: boolean; frame?: string }
+    | { kind: "bitmap"; id: number; at: { x: AtToken; y: AtToken }; hidden: boolean }
+    | { kind: "list"; id?: number; rect: RectLike; items: string[]; visibleItems?: number; search?: boolean }
+    | { kind: "table"; id?: number; rect: RectLike; numColumns?: number; numRows?: number }
+    | { kind: "scrollbar"; id?: number; rect: RectLike; value?: number; minValue?: number; maxValue?: number; pageSize?: number }
+    | { kind: "slider"; id?: number; rect: RectLike; minValue?: number; maxValue?: number; value?: number; vertical?: boolean; thumbId?: number; backgroundId?: number; feedback?: boolean }
+    | { kind: "gadget"; id?: number; rect: RectLike; extended?: boolean }
+    | { kind: "line" | "frame" | "rectangle"; rect: RectLike };
+
+function escapeQuotedText(text: string): string {
+    return text
+        .replace(/\\/g, "\\\\")
+        .replace(/"/g, '\\"')
+        .replace(/\r/g, "\\r")
+        .replace(/\n/g, "\\n");
 }
 
-const PalmFormVisualizer = ({ pilrcText, renderBitmap }: PalmFormVisualizerProps) => {
-    const form = useMemo(() => {
-        const data = {
-            x: 0, y: 0, w: 160, h: 160,
-            title: "",
-            labels: [] as Array<{ text: string; x: number; y: number }>,
-            buttons: [] as Array<{ text: string; x: number; y: number; w: number; h: number }>,
-            bitmaps: [] as Array<{ id: number; x: number; y: number }>
-        };
+function parseNumberOrWord(token: string): AtToken {
+    const t = token.trim().toUpperCase();
+    if (t === "CENTER" || t === "RIGHT" || t === "BOTTOM") return t;
+    const n = Number(token);
+    return Number.isFinite(n) ? n : 0;
+}
 
-        const formMatch = pilrcText.match(/FORM\s+ID\s+\d+\s+AT\s+\(\s*(-?\d+)\s+(-?\d+)\s+(\d+)\s+(\d+)\s*\)/i);
-        if (formMatch) {
-            data.x = parseInt(formMatch[1], 10);
-            data.y = parseInt(formMatch[2], 10);
-            data.w = parseInt(formMatch[3], 10);
-            data.h = parseInt(formMatch[4], 10);
+function parseAtSpec(raw: string): { x: AtToken; y: AtToken; w?: number; h?: number } | null {
+    const m = raw.match(/AT\s*\(\s*([^)]+?)\s*\)/i);
+    if (!m) return null;
+    const parts = m[1].trim().split(/\s+/);
+    if (parts.length < 2) return null;
+
+    const x = parseNumberOrWord(parts[0]);
+    const y = parseNumberOrWord(parts[1]);
+    const w = parts[2] != null ? Number(parts[2]) : undefined;
+    const h = parts[3] != null ? Number(parts[3]) : undefined;
+
+    return {
+        x,
+        y,
+        w: Number.isFinite(w as number) ? (w as number) : undefined,
+        h: Number.isFinite(h as number) ? (h as number) : undefined,
+    };
+}
+
+function estimateTextWidth(text: string, fontSize: number): number {
+    return Math.max(8, Math.ceil(text.length * (fontSize * 0.55)));
+}
+
+function resolveCoord(
+    value: AtToken,
+    extent: number | undefined,
+    containerExtent: number,
+    textExtent = 0
+): number {
+    const size = extent ?? textExtent;
+    switch (value) {
+        case "CENTER":
+            return Math.floor((containerExtent - size) / 2);
+        case "RIGHT":
+        case "BOTTOM":
+            return Math.max(0, containerExtent - size);
+        default:
+            return value;
+    }
+}
+
+function parseFormHeader(text: string): ParsedFormHeader {
+    const headerMatch = text.match(/FORM\s+ID\s+([^\s]+)\s+AT\s+\(\s*([^)]+?)\s*\)/i);
+
+    const defaultBounds: RectLike = { x: 0, y: 0, w: 160, h: 160 };
+    const bounds = headerMatch
+        ? (() => {
+            const parts = headerMatch[2].trim().split(/\s+/);
+            return {
+                x: parseNumberOrWord(parts[0]) || 0,
+                y: parseNumberOrWord(parts[1]) || 0,
+                w: Number(parts[2]) || 160,
+                h: Number(parts[3]) || 160,
+            };
+        })()
+        : defaultBounds;
+
+    const id = headerMatch
+        ? (Number.isFinite(Number(headerMatch[1])) ? Number(headerMatch[1]) : headerMatch[1])
+        : "ID";
+
+    const titleMatch = text.match(/^\s*TITLE\s+"((?:\\.|[^"])*)"/im);
+    const title = titleMatch ? titleMatch[1].replace(/\\r/g, "\r").replace(/\\n/g, "\n") : "";
+
+    const frame = /\bFRAME\b/i.test(text);
+    const modal = /\bMODAL\b/i.test(text) || /\bDOINGDIALOG\b/i.test(text);
+
+    const defaultBtnId = text.match(/DEFAULTBTNID\s+(\d+)/i)?.[1];
+    const helpId = text.match(/HELPID\s+(\d+)/i)?.[1];
+    const menuId = text.match(/MENUID\s+(\d+)/i)?.[1];
+
+    return {
+        id,
+        bounds,
+        title,
+        frame,
+        modal,
+        defaultBtnId: defaultBtnId != null ? Number(defaultBtnId) : null,
+        helpId: helpId != null ? Number(helpId) : null,
+        menuId: menuId != null ? Number(menuId) : null,
+    };
+}
+
+function parseWidgets(pilrcText: string, form: ParsedFormHeader): ParsedWidget[] {
+    const widgets: ParsedWidget[] = [];
+    const lines = pilrcText
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+    for (const line of lines) {
+        if (/^FORM\b/i.test(line) || /^BEGIN$/i.test(line) || /^END$/i.test(line)) continue;
+        if (/^FRAME$/i.test(line)) continue;
+        if (/^MODAL$/i.test(line)) continue;
+        if (/^NOSAVEBEHIND$/i.test(line)) continue;
+        if (/^DEFAULTBTNID\b/i.test(line)) continue;
+        if (/^HELPID\b/i.test(line)) continue;
+        if (/^MENUID\b/i.test(line)) continue;
+        if (/^OBJECT\b/i.test(line)) continue;
+
+        if (/^TITLE\s+"/i.test(line)) {
+            const title = line.match(/^TITLE\s+"((?:\\.|[^"])*)"/i)?.[1] ?? "";
+            widgets.push({ kind: "title", text: title.replace(/\\r/g, "\r").replace(/\\n/g, "\n") });
+            continue;
         }
 
-        const titleMatch = pilrcText.match(/TITLE\s+"([^"]+)"/i);
-        if (titleMatch) data.title = titleMatch[1];
-
-        const labelRegex = /LABEL\s+"([^"]+)"\s+ID\s+\d+\s+AT\s+\(\s*(-?\d+)\s+(-?\d+)\s*\)/gi;
-        let m;
-        while ((m = labelRegex.exec(pilrcText)) !== null) {
-            const parsedText = m[1].replace(/\\r/g, '\n').replace(/\\n/g, '\n');
-            data.labels.push({ text: parsedText, x: parseInt(m[2], 10), y: parseInt(m[3], 10) });
-        }
-
-        const btnRegex = /BUTTON\s+"([^"]+)"\s+ID\s+\d+\s+AT\s+\(\s*(-?\d+)\s+(-?\d+)\s+(\d+)\s+(\d+)\s*\)/gi;
-        while ((m = btnRegex.exec(pilrcText)) !== null) {
-            data.buttons.push({
-                text: m[1],
-                x: parseInt(m[2], 10), y: parseInt(m[3], 10),
-                w: parseInt(m[4], 10), h: parseInt(m[5], 10)
+        if (/^LABEL\b/i.test(line)) {
+            const text = line.match(/^LABEL\s+"((?:\\.|[^"])*)"/i)?.[1] ?? "";
+            const at = parseAtSpec(line);
+            if (!at) continue;
+            const id = line.match(/\bID\s+(\d+)/i)?.[1];
+            const font = line.match(/\bFONT\s+(\d+)/i)?.[1];
+            widgets.push({
+                kind: "label",
+                text: text.replace(/\\r/g, "\r").replace(/\\n/g, "\n"),
+                id: id != null ? Number(id) : undefined,
+                at: { x: at.x, y: at.y },
+                font: font != null ? Number(font) : undefined,
             });
+            continue;
         }
 
-        const bmpRegex = /FORMBITMAP\s+AT\s+\(\s*(-?\d+)\s+(-?\d+)\s*\)\s+BITMAP\s+(\d+)/gi;
-        while ((m = bmpRegex.exec(pilrcText)) !== null) {
-            data.bitmaps.push({
-                x: parseInt(m[1], 10), y: parseInt(m[2], 10),
-                id: parseInt(m[3], 10)
+        if (/^(BUTTON|PUSHBUTTON|CHECKBOX|POPUPTRIGGER|SELECTORTRIGGER|REPEATBUTTON|CONTROL|GRAPHICALCONTROL)\b/i.test(line)) {
+            const text = line.match(/^.+?"((?:\\.|[^"])*)"/i)?.[1] ?? "";
+            const at = parseAtSpec(line);
+            if (!at) continue;
+            const id = line.match(/\bID\s+(\d+)/i)?.[1];
+            const hidden = /\bHIDDEN\b/i.test(line) || /\bNONUSABLE\b/i.test(line);
+            const defaultBtn = id != null && form.defaultBtnId != null && Number(id) === form.defaultBtnId;
+            const frame =
+                /\bNOFRAME\b/i.test(line) ? "NOFRAME" :
+                    /\bBOLDFRAME\b/i.test(line) ? "BOLDFRAME" :
+                        /\bRECTFRAME\b/i.test(line) ? "RECTFRAME" :
+                            /\bFRAME\b/i.test(line) ? "FRAME" : undefined;
+
+            widgets.push({
+                kind: "button",
+                id: id != null ? Number(id) : undefined,
+                text: text.replace(/\\r/g, "\r").replace(/\\n/g, "\n"),
+                rect: { x: at.x, y: at.y, w: at.w ?? 0, h: at.h ?? 0 },
+                hidden,
+                defaultBtn,
+                frame,
             });
+            continue;
         }
 
-        return data;
-    }, [pilrcText]);
+        if (/^FIELD\b/i.test(line)) {
+            const at = parseAtSpec(line);
+            if (!at) continue;
+            const id = line.match(/\bID\s+(\d+)/i)?.[1];
+            const maxChars = line.match(/\bMAXCHARS\s+(\d+)/i)?.[1];
+            widgets.push({
+                kind: "field",
+                id: id != null ? Number(id) : undefined,
+                rect: { x: at.x, y: at.y, w: at.w ?? 0, h: at.h ?? 0 },
+                maxChars: maxChars != null ? Number(maxChars) : undefined,
+                editable: !/\bNONEDITABLE\b/i.test(line),
+                singleLine: /\bSINGLELINE\b/i.test(line) || !/\bMULTIPLELINES\b/i.test(line),
+            });
+            continue;
+        }
+
+        if (/^FORMBITMAP\b/i.test(line)) {
+            const at = parseAtSpec(line);
+            const id = line.match(/\bBITMAP\s+(\d+)/i)?.[1];
+            if (!at || id == null) continue;
+            widgets.push({
+                kind: "bitmap",
+                id: Number(id),
+                at: { x: at.x, y: at.y },
+                hidden: /\bHIDDEN\b/i.test(line) || /\bNONUSABLE\b/i.test(line),
+            });
+            continue;
+        }
+
+        if (/^LIST\b/i.test(line)) {
+            const at = parseAtSpec(line);
+            if (!at) continue;
+            const id = line.match(/\bID\s+(\d+)/i)?.[1];
+            const items = [...line.matchAll(/"((?:\\.|[^"])*)"/g)].map((m) =>
+                m[1].replace(/\\r/g, "\r").replace(/\\n/g, "\n")
+            );
+            const visibleItems = line.match(/\bVISIBLEITEMS\s+(\d+)/i)?.[1];
+            widgets.push({
+                kind: "list",
+                id: id != null ? Number(id) : undefined,
+                rect: { x: at.x, y: at.y, w: at.w ?? 0, h: at.h ?? 0 },
+                items,
+                visibleItems: visibleItems != null ? Number(visibleItems) : undefined,
+                search: /\bSEARCH\b/i.test(line),
+            });
+            continue;
+        }
+
+        if (/^TABLE\b/i.test(line)) {
+            const at = parseAtSpec(line);
+            if (!at) continue;
+            const id = line.match(/\bID\s+(\d+)/i)?.[1];
+            const numColumns = line.match(/\bNUMCOLUMNS\s+(\d+)/i)?.[1];
+            const numRows = line.match(/\bNUMROWS\s+(\d+)/i)?.[1];
+            widgets.push({
+                kind: "table",
+                id: id != null ? Number(id) : undefined,
+                rect: { x: at.x, y: at.y, w: at.w ?? 0, h: at.h ?? 0 },
+                numColumns: numColumns != null ? Number(numColumns) : undefined,
+                numRows: numRows != null ? Number(numRows) : undefined,
+            });
+            continue;
+        }
+
+        if (/^SCROLLBAR\b/i.test(line)) {
+            const at = parseAtSpec(line);
+            if (!at) continue;
+            widgets.push({
+                kind: "scrollbar",
+                id: line.match(/\bID\s+(\d+)/i)?.[1] ? Number(line.match(/\bID\s+(\d+)/i)![1]) : undefined,
+                rect: { x: at.x, y: at.y, w: at.w ?? 0, h: at.h ?? 0 },
+                value: line.match(/\bVALUE\s+(-?\d+)/i)?.[1] ? Number(line.match(/\bVALUE\s+(-?\d+)/i)![1]) : undefined,
+                minValue: line.match(/\bMINVALUE\s+(-?\d+)/i)?.[1] ? Number(line.match(/\bMINVALUE\s+(-?\d+)/i)![1]) : undefined,
+                maxValue: line.match(/\bMAXVALUE\s+(-?\d+)/i)?.[1] ? Number(line.match(/\bMAXVALUE\s+(-?\d+)/i)![1]) : undefined,
+                pageSize: line.match(/\bPAGESIZE\s+(-?\d+)/i)?.[1] ? Number(line.match(/\bPAGESIZE\s+(-?\d+)/i)![1]) : undefined,
+            });
+            continue;
+        }
+
+        if (/^SLIDER\b/i.test(line)) {
+            const at = parseAtSpec(line);
+            if (!at) continue;
+            widgets.push({
+                kind: "slider",
+                id: line.match(/\bID\s+(\d+)/i)?.[1] ? Number(line.match(/\bID\s+(\d+)/i)![1]) : undefined,
+                rect: { x: at.x, y: at.y, w: at.w ?? 0, h: at.h ?? 0 },
+                minValue: line.match(/\bMINVALUE\s+(-?\d+)/i)?.[1] ? Number(line.match(/\bMINVALUE\s+(-?\d+)/i)![1]) : undefined,
+                maxValue: line.match(/\bMAXVALUE\s+(-?\d+)/i)?.[1] ? Number(line.match(/\bMAXVALUE\s+(-?\d+)/i)![1]) : undefined,
+                value: line.match(/\bVALUE\s+(-?\d+)/i)?.[1] ? Number(line.match(/\bVALUE\s+(-?\d+)/i)![1]) : undefined,
+                vertical: /\bVERTICAL\b/i.test(line),
+                thumbId: line.match(/\bTHUMBID\s+(\d+)/i)?.[1] ? Number(line.match(/\bTHUMBID\s+(\d+)/i)![1]) : undefined,
+                backgroundId: line.match(/\bBACKGROUNDID\s+(\d+)/i)?.[1] ? Number(line.match(/\bBACKGROUNDID\s+(\d+)/i)![1]) : undefined,
+                feedback: /\bFEEDBACK\b/i.test(line),
+            });
+            continue;
+        }
+
+        if (/^GADGET\b/i.test(line)) {
+            const at = parseAtSpec(line);
+            if (!at) continue;
+            widgets.push({
+                kind: "gadget",
+                id: line.match(/\bID\s+(\d+)/i)?.[1] ? Number(line.match(/\bID\s+(\d+)/i)![1]) : undefined,
+                rect: { x: at.x, y: at.y, w: at.w ?? 0, h: at.h ?? 0 },
+                extended: /\bEXTENDED\b/i.test(line),
+            });
+            continue;
+        }
+
+        if (/^LINE\b/i.test(line) || /^FRAME\b/i.test(line) || /^RECTANGLE\b/i.test(line)) {
+            const at = parseAtSpec(line);
+            if (!at) continue;
+            const kind = line.split(/\s+/)[0].toLowerCase() as "line" | "frame" | "rectangle";
+            widgets.push({ kind, rect: { x: at.x, y: at.y, w: at.w ?? 0, h: at.h ?? 0 } });
+            continue;
+        }
+    }
+
+    return widgets;
+}
+
+// ── UI Components ─────────────────────────────────────────────────────────────
+
+type WidgetProps<T> = { widget: T; formWidth: number; formHeight: number };
+
+function PalmButton({ widget, formWidth, formHeight }: WidgetProps<Extract<ParsedWidget, { kind: "button" }>>) {
+    const width = widget.rect.w || Math.max(26, estimateTextWidth(widget.text, 9) + 10);
+    const height = widget.rect.h || 12;
+    const left = resolveCoord(widget.rect.x, width, formWidth);
+    const top = resolveCoord(widget.rect.y, height, formHeight);
+
+    const frameStyle =
+        widget.frame === "NOFRAME"
+            ? { border: "none", borderRadius: 0 }
+            : widget.frame === "BOLDFRAME"
+                ? { border: "2px solid #000", borderRadius: "4px" }
+                : widget.frame === "RECTFRAME"
+                    ? { borderRadius: 0 }
+                    : { borderRadius: "4px" }; // Standard Palm Button curve
 
     return (
-        <Box sx={{ width: 320, height: 320, display: 'flex', justifyContent: 'center', alignItems: 'center', bgcolor: '#e0e0e0', borderRadius: 1 }}>
+        <Box sx={{
+            position: "absolute", left, top, width, height, boxSizing: "border-box",
+            border: "1px solid #000",
+            bgcolor: widget.defaultBtn ? "#000" : "#fff",
+            color: widget.defaultBtn ? "#fff" : "#000",
+            opacity: widget.hidden ? 0.35 : 1,
+            display: "flex", alignItems: "center", justifyContent: "center", px: "3px",
+            fontSize: "9px", fontWeight: 700, lineHeight: "10px",
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            fontFamily: "PalmOS, monospace",
+            ...frameStyle,
+        }}>
+            {widget.text}
+        </Box>
+    );
+}
+
+function PalmField({ widget, formWidth, formHeight }: WidgetProps<Extract<ParsedWidget, { kind: "field" }>>) {
+    const w = widget.rect.w || 60;
+    const h = widget.rect.h || 12;
+    const left = resolveCoord(widget.rect.x, w, formWidth);
+    const top = resolveCoord(widget.rect.y, h, formHeight);
+
+    return (
+        <Box sx={{
+            position: "absolute", left, top, width: w, height: h, boxSizing: "border-box",
+            bgcolor: "transparent", overflow: "hidden",
+        }}>
             <Box sx={{
-                width: 160, height: 160, backgroundColor: '#ffffff', position: 'relative',
-                transform: 'scale(2)', border: '1px solid #999', boxShadow: '0px 4px 12px rgba(0,0,0,0.15)',
-                fontFamily: 'sans-serif', overflow: 'hidden', boxSizing: 'border-box'
+                position: "absolute", left: 0, right: 0, bottom: 1,
+                borderBottom: "1px dotted #000", // Standard PilRC Field Underline
+                opacity: widget.editable ? 1 : 0.4,
+            }} />
+            <Box sx={{
+                position: "absolute", inset: 0, py: "1px",
+                fontSize: "9px", fontFamily: "PalmOS, monospace", lineHeight: "10px", color: "#000",
+                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+            }}>
+                {widget.maxChars ? `Field (${widget.maxChars})` : "Field"}
+            </Box>
+        </Box>
+    );
+}
+
+function PalmList({ widget, formWidth, formHeight }: WidgetProps<Extract<ParsedWidget, { kind: "list" }>>) {
+    const visible = Math.max(1, widget.visibleItems ?? Math.min(widget.items.length || 1, 4));
+    const h = widget.rect.h || visible * 11 + 2;
+    const left = resolveCoord(widget.rect.x, widget.rect.w, formWidth);
+    const top = resolveCoord(widget.rect.y, h, formHeight);
+
+    return (
+        <Box sx={{
+            position: "absolute", left, top, width: widget.rect.w, height: h,
+            boxSizing: "border-box", border: "1px solid #000", bgcolor: "#fff", overflow: "hidden",
+        }}>
+            {Array.from({ length: visible }).map((_, i) => {
+                const text = widget.items[i] ?? "";
+                return (
+                    <Box key={i} sx={{
+                        height: 11, px: "2px", display: "flex", alignItems: "center",
+                        bgcolor: i === 0 ? "#000" : "transparent",
+                        color: i === 0 ? "#fff" : "#000",
+                        fontSize: "9px", fontFamily: "PalmOS, monospace", lineHeight: "10px",
+                        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                    }}>
+                        {text || (widget.search ? "Search…" : "Item")}
+                    </Box>
+                );
+            })}
+        </Box>
+    );
+}
+
+function PalmTable({ widget, formWidth, formHeight }: WidgetProps<Extract<ParsedWidget, { kind: "table" }>>) {
+    const cols = Math.max(1, widget.numColumns ?? 2);
+    const rows = Math.max(1, widget.numRows ?? 3);
+    const cellW = Math.max(12, Math.floor((widget.rect.w || 60) / cols));
+    const cellH = 10;
+    const h = widget.rect.h || rows * cellH + 2;
+    const left = resolveCoord(widget.rect.x, widget.rect.w, formWidth);
+    const top = resolveCoord(widget.rect.y, h, formHeight);
+
+    return (
+        <Box sx={{
+            position: "absolute", left, top, width: widget.rect.w, height: h,
+            boxSizing: "border-box", border: "1px solid #000", bgcolor: "#fff", overflow: "hidden",
+        }}>
+            {Array.from({ length: rows }).map((_, r) => (
+                <Box key={r} sx={{ display: "flex", height: cellH }}>
+                    {Array.from({ length: cols }).map((__, c) => (
+                        <Box key={c} sx={{
+                            width: cellW,
+                            borderRight: c < cols - 1 ? "1px solid #000" : "none",
+                            borderBottom: r < rows - 1 ? "1px solid #000" : "none",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: "7px", fontFamily: "PalmOS, monospace",
+                        }}>
+                            &nbsp;
+                        </Box>
+                    ))}
+                </Box>
+            ))}
+        </Box>
+    );
+}
+
+function PalmScrollbar({ widget, formWidth, formHeight }: WidgetProps<Extract<ParsedWidget, { kind: "scrollbar" }>>) {
+    const w = widget.rect.w || 7;
+    const h = widget.rect.h || 48;
+    const left = resolveCoord(widget.rect.x, w, formWidth);
+    const top = resolveCoord(widget.rect.y, h, formHeight);
+
+    const min = widget.minValue ?? 0;
+    const max = widget.maxValue ?? 100;
+    const value = widget.value ?? min;
+    const pct = max > min ? Math.max(0, Math.min(1, (value - min) / (max - min))) : 0;
+    const thumbH = Math.max(10, Math.floor(h * 0.25));
+    const thumbY = Math.floor((h - thumbH - 2) * pct) + 1;
+
+    return (
+        <Box sx={{
+            position: "absolute", left, top, width: w, height: h,
+            border: "1px solid #000", bgcolor: "#fff", boxSizing: "border-box",
+        }}>
+            <Box sx={{
+                position: "absolute", left: 1, right: 1, top: thumbY, height: thumbH, bgcolor: "#000",
+            }} />
+        </Box>
+    );
+}
+
+function PalmSlider({ widget, formWidth, formHeight }: WidgetProps<Extract<ParsedWidget, { kind: "slider" }>>) {
+    const left = resolveCoord(widget.rect.x, widget.rect.w, formWidth);
+    const top = resolveCoord(widget.rect.y, widget.rect.h, formHeight);
+    const vertical = widget.vertical || widget.rect.h > widget.rect.w;
+    const min = widget.minValue ?? 0;
+    const max = widget.maxValue ?? 100;
+    const value = widget.value ?? min;
+    const pct = max > min ? Math.max(0, Math.min(1, (value - min) / (max - min))) : 0.5;
+
+    const railInset = 3;
+    const thumbSize = 6;
+    const travel = vertical
+        ? Math.max(0, widget.rect.h - thumbSize - railInset * 2)
+        : Math.max(0, widget.rect.w - thumbSize - railInset * 2);
+    const thumbPos = railInset + Math.floor(travel * pct);
+
+    return (
+        <Box sx={{
+            position: "absolute", left, top, width: widget.rect.w, height: widget.rect.h,
+            border: "1px solid #000", bgcolor: "#fff", boxSizing: "border-box", overflow: "hidden",
+        }}>
+            <Box sx={{
+                position: "absolute",
+                ...(vertical
+                    ? { left: "50%", top: railInset, bottom: railInset, width: 1, transform: "translateX(-50%)", bgcolor: "#000" }
+                    : { top: "50%", left: railInset, right: railInset, height: 1, transform: "translateY(-50%)", bgcolor: "#000" }),
+            }} />
+            <Box sx={{
+                position: "absolute",
+                ...(vertical
+                    ? { left: 1, top: thumbPos, width: widget.rect.w - 2, height: thumbSize }
+                    : { top: 1, left: thumbPos, width: thumbSize, height: widget.rect.h - 2 }),
+                bgcolor: "#000",
+            }} />
+        </Box>
+    );
+}
+
+// ── Main Renderer ─────────────────────────────────────────────────────────────
+
+export const PalmFormVisualizer = ({ pilrcText, renderBitmap }: PalmFormVisualizerProps) => {
+    const form = useMemo(() => {
+        const header = parseFormHeader(pilrcText);
+        const widgets = parseWidgets(pilrcText, header);
+        return { header, widgets };
+    }, [pilrcText]);
+
+    const outerW = 320;
+    const outerH = 320;
+    const fw = form.header.bounds.w;
+    const fh = form.header.bounds.h;
+    const formBounds = form.header.bounds;
+
+    return (
+        <Box sx={{
+            width: outerW, height: outerH, display: "flex", justifyContent: "center", alignItems: "center",
+            bgcolor: "#e0e0e0", borderRadius: 1,
+        }}>
+            <Box sx={{
+                width: 160, height: 160, backgroundColor: "#fff", position: "relative",
+                transform: "scale(2)", transformOrigin: "center center",
+                border: form.header.modal ? "2px solid #000" : "1px solid #999",
+                boxShadow: "0px 4px 12px rgba(0,0,0,0.15)",
+                fontFamily: "sans-serif", overflow: "hidden", boxSizing: "border-box",
+                backgroundImage: "radial-gradient(#d3d3d3 1px, transparent 1px)", backgroundSize: "4px 4px",
             }}>
                 <Box sx={{
-                    position: 'absolute', left: form.x, top: form.y, width: form.w, height: form.h,
-                    border: '2px solid #000080', backgroundColor: '#fff', borderRadius: '3px', boxSizing: 'border-box',
+                    position: "absolute",
+                    left: resolveCoord(formBounds.x, fw, 160),
+                    top: resolveCoord(formBounds.y, fh, 160),
+                    width: fw, height: fh, bgcolor: "#fff",
+                    border: form.header.modal ? "2px solid #000" : "none",
+                    boxSizing: "border-box", overflow: "hidden",
                 }}>
-                    {form.title && (
-                        <Box sx={{
-                            position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: '#000080', color: '#fff',
-                            fontSize: '9px', fontWeight: 700, padding: '1px 4px', lineHeight: '12px',
-                        }}>
-                            {form.title}
-                        </Box>
-                    )}
+                    {form.widgets.map((w, i) => {
+                        switch (w.kind) {
+                            case "title":
+                                return (
+                                    <Box key={i} sx={{
+                                        position: "absolute", left: 0, top: 0, width: "100%", height: 14,
+                                        bgcolor: "#000", color: "#fff", px: "3px",
+                                        display: "flex", alignItems: "center",
+                                        fontFamily: "PalmOS, monospace", fontSize: "12px", fontWeight: 700,
+                                        boxSizing: "border-box", overflow: "hidden",
+                                        textOverflow: "ellipsis", whiteSpace: "nowrap",
+                                    }}>
+                                        {w.text}
+                                    </Box>
+                                );
 
-                    {form.labels.map((lbl, i) => (
-                        <Box key={`lbl-${i}`} sx={{
-                            position: 'absolute', left: lbl.x, top: lbl.y, fontSize: '7px', fontWeight: 600,
-                            color: '#000', whiteSpace: 'pre-wrap', lineHeight: '11px', letterSpacing: '-0.2px'
-                        }}>
-                            {lbl.text}
-                        </Box>
-                    ))}
+                            case "label": {
+                                const text = w.text.replace(/\r/g, "\n");
+                                const fontSize = (w.font === 2 || w.font === 7) ? 12 : 9;
+                                const isBold = w.font === 1 || w.font === 7;
+                                const width = estimateTextWidth(text.replace(/\n/g, " "), fontSize);
+                                const x = resolveCoord(w.at.x, width, fw, width);
+                                const y = resolveCoord(w.at.y, fontSize + 2, fh, fontSize + 2);
+                                return (
+                                    <Box key={i} sx={{
+                                        position: "absolute", left: x, top: y, width, color: "#000",
+                                        fontFamily: "PalmOS, monospace", fontSize: `${fontSize}px`,
+                                        fontWeight: isBold ? 700 : 400, lineHeight: `${fontSize + 1}px`,
+                                        whiteSpace: "pre-wrap", textOverflow: "ellipsis", textAlign: "left",
+                                    }}>
+                                        {text}
+                                    </Box>
+                                );
+                            }
 
-                    {form.buttons.map((btn, i) => (
-                        <Box key={`btn-${i}`} sx={{
-                            position: 'absolute', left: btn.x, top: btn.y, width: btn.w, height: btn.h,
-                            border: '1px solid #000', borderRadius: '4px', backgroundColor: '#cccccc', color: '#000',
-                            fontSize: '6px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-                        }}>
-                            {btn.text}
-                        </Box>
-                    ))}
+                            case "field":
+                                return <PalmField key={i} widget={w} formWidth={fw} formHeight={fh} />;
+                            case "button":
+                                return <PalmButton key={i} widget={w} formWidth={fw} formHeight={fh} />;
+                            case "list":
+                                return <PalmList key={i} widget={w} formWidth={fw} formHeight={fh} />;
+                            case "table":
+                                return <PalmTable key={i} widget={w} formWidth={fw} formHeight={fh} />;
+                            case "scrollbar":
+                                return <PalmScrollbar key={i} widget={w} formWidth={fw} formHeight={fh} />;
+                            case "slider":
+                                return <PalmSlider key={i} widget={w} formWidth={fw} formHeight={fh} />;
 
-                    {form.bitmaps.map((bmp, i) => {
-                        const customImageNode = renderBitmap ? renderBitmap(bmp.id) : null;
+                            case "bitmap":
+                                return (
+                                    <Box key={i} sx={{
+                                        position: "absolute",
+                                        left: resolveCoord(w.at.x, 0, fw),
+                                        top: resolveCoord(w.at.y, 0, fh)
+                                    }}>
+                                        {renderBitmap ? renderBitmap(w.id) : <Box sx={{ width: 16, height: 16, border: '1px solid #aaa', bgcolor: '#ccc' }} />}
+                                    </Box>
+                                );
 
-                        return (
-                            <Box key={`bmp-${i}`} sx={{
-                                position: 'absolute',
-                                left: bmp.x,
-                                top: bmp.y,
-                                ...(!customImageNode && {
-                                    width: 36, height: 40, backgroundColor: '#00703c', border: '1px dashed #fff',
-                                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff',
-                                })
-                            }}>
-                                {customImageNode ? (
-                                    customImageNode
-                                ) : (
-                                    <>
-                                        <ImageIcon sx={{ fontSize: 16 }} />
-                                        <Typography sx={{ fontSize: '7px', mt: 0.5 }}>{bmp.id}</Typography>
-                                    </>
-                                )}
-                            </Box>
-                        );
+                            case "line":
+                                return (
+                                    <Box key={i} sx={{
+                                        position: "absolute",
+                                        left: resolveCoord(w.rect.x, w.rect.w, fw),
+                                        top: resolveCoord(w.rect.y, w.rect.h, fh),
+                                        width: w.rect.w || 1, height: w.rect.h || 1, bgcolor: "#000"
+                                    }} />
+                                );
+
+                            case "frame":
+                            case "rectangle":
+                                return (
+                                    <Box key={i} sx={{
+                                        position: "absolute",
+                                        left: resolveCoord(w.rect.x, w.rect.w, fw),
+                                        top: resolveCoord(w.rect.y, w.rect.h, fh),
+                                        width: w.rect.w, height: w.rect.h,
+                                        border: w.kind === "frame" ? "1px solid #000" : "none",
+                                        bgcolor: w.kind === "rectangle" ? "#000" : "transparent"
+                                    }} />
+                                );
+
+                            case "gadget":
+                                return (
+                                    <Box key={i} sx={{
+                                        position: "absolute",
+                                        left: resolveCoord(w.rect.x, w.rect.w, fw),
+                                        top: resolveCoord(w.rect.y, w.rect.h, fh),
+                                        width: w.rect.w, height: w.rect.h,
+                                        border: "1px dashed #999", bgcolor: "rgba(0,0,0,0.05)"
+                                    }} />
+                                );
+
+                            default:
+                                return null;
+                        }
                     })}
                 </Box>
             </Box>
