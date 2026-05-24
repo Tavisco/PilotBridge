@@ -43,6 +43,7 @@ import 'react-big-calendar/lib/css/react-big-calendar.css';
 import {ManageAppsPage} from "./panels/manage-apps.tsx";
 import {PrcExplorerPanel} from "./panels/prc-explorer-panel.tsx";
 import {ManageSearch} from "@mui/icons-material";
+import {ThemeModeSelector} from "./components/ThemeModeSelector.tsx";
 
 
 function UnsupportedApisBanner() {
@@ -261,6 +262,8 @@ export function App() {
         <Divider />
       </div>
       <div style={{ marginTop: "auto" }}>
+        <Divider />
+        <ThemeModeSelector />
         <Divider />
         <DeviceInfoPanel />
         <Divider />

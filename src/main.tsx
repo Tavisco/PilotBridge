@@ -7,15 +7,13 @@ import ReactDOM from 'react-dom/client';
 import { App } from './app';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { prefsStore } from './prefs-store';
-import { observer } from "mobx-react"; // Import observer
+import { observer } from "mobx-react";
+import {useAppTheme} from "./useAppTheme.ts"; // Import observer
 
 export const AppWrapper = observer(function AppWrapper() {
-    const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)');
+    // const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)');
 
-    const theme = useMemo(() => createTheme({
-        typography: { fontFamily: 'Inter, sans-serif' },
-        palette: { mode: prefersDarkMode ? 'dark' : 'light' },
-    }), [prefersDarkMode]);
+    const theme = useAppTheme();
 
     // Read directly from the store inside the render function
     const clientId = (prefsStore.get('googleClientID') as string || '').trim();
