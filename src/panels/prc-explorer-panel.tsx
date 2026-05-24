@@ -112,7 +112,6 @@ export function PrcExplorerPanel({
                 const parsed = header.attributes.resDB
                     ? RawPrcDatabase.from(fileBuffer)
                     : RawPdbDatabase.from(fileBuffer);
-                console.log(parsed);
                 setLocalDb(parsed);
                 setSelectedRecord(null);
                 setOpenTypes({});

@@ -15,16 +15,45 @@ export type AtToken = number | "CENTER" | "RIGHT" | "BOTTOM";
 
 type ParsedWidget =
     | { kind: "title"; text: string }
-    | { kind: "label"; text: string; id?: number; at: { x: AtToken; y: AtToken }; font?: number }
-    | { kind: "field"; id?: number; rect: RectLike; maxChars?: number; editable: boolean; singleLine: boolean }
-    | { kind: "button"; id?: number; text: string; rect: RectLike; hidden: boolean; defaultBtn: boolean; frame?: string }
-    | { kind: "bitmap"; id: number; at: { x: number; y: number }; hidden: boolean }
-    | { kind: "list"; id?: number; rect: RectLike; items: string[]; visibleItems?: number; search?: boolean }
+    | { kind: "label"; text: string; id?: number; at: { x: AtToken; y: AtToken }; font?: number; usable: boolean }
+    | {
+    kind: "field";
+    id?: number;
+    rect: RectLike;
+    maxChars?: number;
+    editable: boolean;
+    singleLine: boolean;
+    underlined: boolean;
+    dynamicSize: boolean;
+    autoShift: boolean;
+    hasScrollBar: boolean;
+    numeric: boolean;
+    justification: "left" | "center" | "right";
+    usable: boolean;
+    font?: number;
+}
+    | {
+    kind: "button";
+    style: string;
+    id?: number;
+    text: string;
+    rect: RectLike;
+    hidden: boolean;
+    usable: boolean;
+    disabled: boolean;
+    defaultBtn: boolean;
+    frame?: string;
+    group?: number;
+    font?: number;
+    leftAnchor: boolean;
+}
+    | { kind: "bitmap"; id: number; at: { x: number; y: number }; usable: boolean; hidden: boolean }
+    | { kind: "list"; id?: number; rect: RectLike; items: string[]; visibleItems?: number; search: boolean; usable: boolean; disabled: boolean; font?: number }
     | { kind: "table"; id?: number; rect: RectLike; numColumns?: number; numRows?: number }
     | { kind: "scrollbar"; id?: number; rect: RectLike; value?: number; minValue?: number; maxValue?: number; pageSize?: number }
-    | { kind: "slider"; id?: number; rect: RectLike; minValue?: number; maxValue?: number; value?: number; vertical?: boolean; thumbId?: number; backgroundId?: number; feedback?: boolean }
-    | { kind: "gadget"; id?: number; rect: RectLike; extended?: boolean }
-    | { kind: "line" | "frame" | "rectangle"; rect: RectLike };
+    | { kind: "slider"; id?: number; rect: RectLike; minValue?: number; maxValue?: number; value?: number; vertical: boolean; thumbId?: number; backgroundId?: number; feedback: boolean }
+    | { kind: "gadget"; id?: number; rect: RectLike; extended: boolean }
+    | { kind: "line" | "frame" | "rectangle" | "graffitistateindicator"; rect: RectLike };
 
 export function parseFormHeader(text: string): ParsedFormHeader {
     const headerMatch = text.match(/FORM\s+ID\s+([^\s]+)\s+AT\s+\(\s*([^)]+?)\s*\)/i);
@@ -107,13 +136,15 @@ export function parseWidgets(pilrcText: string, form: ParsedFormHeader): ParsedW
 
     for (const line of lines) {
         if (/^FORM\b/i.test(line) || /^BEGIN$/i.test(line) || /^END$/i.test(line)) continue;
-        if (/^FRAME$/i.test(line)) continue;
+        if (/^FRAME$/i.test(line) || /^NOFRAME$/i.test(line)) continue;
         if (/^MODAL$/i.test(line)) continue;
-        if (/^NOSAVEBEHIND$/i.test(line)) continue;
+        if (/^SAVEBEHIND$/i.test(line) || /^NOSAVEBEHIND$/i.test(line)) continue;
+        if (/^USABLE$/i.test(line) || /^NONUSABLE$/i.test(line)) continue;
         if (/^DEFAULTBTNID\b/i.test(line)) continue;
         if (/^HELPID\b/i.test(line)) continue;
         if (/^MENUID\b/i.test(line)) continue;
-        if (/^OBJECT\b/i.test(line)) continue; // ignore frmFieldObj etc.
+        if (/^OBJECT\b/i.test(line)) continue; // ignore frmGraffitiStateObj etc.
+        // if (/^GRAFFITISTATEINDICATOR\b/i.test(line)) continue; // Not tracked in ParsedWidget union currently
 
         if (/^TITLE\s+"/i.test(line)) {
             const title = line.match(/^TITLE\s+"((?:\\.|[^"])*)"/i)?.[1] ?? "";
@@ -127,23 +158,36 @@ export function parseWidgets(pilrcText: string, form: ParsedFormHeader): ParsedW
             if (!at) continue;
             const id = line.match(/\bID\s+(\d+)/i)?.[1];
             const font = line.match(/\bFONT\s+(\d+)/i)?.[1];
+            const usable = !/\bNONUSABLE\b/i.test(line);
+
             widgets.push({
                 kind: "label",
                 text: text.replace(/\\r/g, "\r").replace(/\\n/g, "\n"),
                 id: id != null ? Number(id) : undefined,
                 at: { x: at.x, y: at.y },
                 font: font != null ? Number(font) : undefined,
+                usable
             });
             continue;
         }
 
         if (/^(BUTTON|PUSHBUTTON|CHECKBOX|POPUPTRIGGER|SELECTORTRIGGER|REPEATBUTTON|CONTROL|GRAPHICALCONTROL)\b/i.test(line)) {
+            const styleMatch = line.match(/^(BUTTON|PUSHBUTTON|CHECKBOX|POPUPTRIGGER|SELECTORTRIGGER|REPEATBUTTON|CONTROL|GRAPHICALCONTROL)\b/i);
+            const style = styleMatch ? styleMatch[1].toUpperCase() : "BUTTON";
             const text = line.match(/^.+?"((?:\\.|[^"])*)"/i)?.[1] ?? "";
             const at = parseAtSpec(line);
             if (!at) continue;
+
             const id = line.match(/\bID\s+(\d+)/i)?.[1];
-            const hidden = /\bHIDDEN\b/i.test(line) || /\bNONUSABLE\b/i.test(line);
+            const group = line.match(/\bGROUP\s+(\d+)/i)?.[1];
+            const font = line.match(/\bFONT\s+(\d+)/i)?.[1];
+
+            const usable = !/\bNONUSABLE\b/i.test(line);
+            const hidden = !usable || /\bHIDDEN\b/i.test(line);
+            const disabled = /\bDISABLED\b/i.test(line);
+            const leftAnchor = !/\bRIGHTANCHOR\b/i.test(line);
             const defaultBtn = id != null && form.defaultBtnId != null && Number(id) === form.defaultBtnId;
+
             const frame =
                 /\bNOFRAME\b/i.test(line) ? "NOFRAME" :
                     /\bBOLDFRAME\b/i.test(line) ? "BOLDFRAME" :
@@ -152,6 +196,7 @@ export function parseWidgets(pilrcText: string, form: ParsedFormHeader): ParsedW
 
             widgets.push({
                 kind: "button",
+                style,
                 id: id != null ? Number(id) : undefined,
                 text: text.replace(/\\r/g, "\r").replace(/\\n/g, "\n"),
                 rect: {
@@ -161,8 +206,13 @@ export function parseWidgets(pilrcText: string, form: ParsedFormHeader): ParsedW
                     h: at.h ?? 0,
                 },
                 hidden,
+                usable,
+                disabled,
                 defaultBtn,
                 frame,
+                group: group != null ? Number(group) : undefined,
+                font: font != null ? Number(font) : undefined,
+                leftAnchor
             });
             continue;
         }
@@ -172,6 +222,8 @@ export function parseWidgets(pilrcText: string, form: ParsedFormHeader): ParsedW
             if (!at) continue;
             const id = line.match(/\bID\s+(\d+)/i)?.[1];
             const maxChars = line.match(/\bMAXCHARS\s+(\d+)/i)?.[1];
+            const font = line.match(/\bFONT\s+(\d+)/i)?.[1];
+
             widgets.push({
                 kind: "field",
                 id: id != null ? Number(id) : undefined,
@@ -184,6 +236,14 @@ export function parseWidgets(pilrcText: string, form: ParsedFormHeader): ParsedW
                 maxChars: maxChars != null ? Number(maxChars) : undefined,
                 editable: !/\bNONEDITABLE\b/i.test(line),
                 singleLine: /\bSINGLELINE\b/i.test(line) || !/\bMULTIPLELINES\b/i.test(line),
+                underlined: /\bUNDERLINED\b/i.test(line),
+                dynamicSize: /\bDYNAMICSIZE\b/i.test(line),
+                autoShift: /\bAUTOSHIFT\b/i.test(line),
+                hasScrollBar: /\bHASSCROLLBAR\b/i.test(line),
+                numeric: /\bNUMERIC\b/i.test(line),
+                justification: /\bCENTERALIGN\b/i.test(line) ? "center" : /\bRIGHTALIGN\b/i.test(line) ? "right" : "left",
+                usable: !/\bNONUSABLE\b/i.test(line),
+                font: font != null ? Number(font) : undefined,
             });
             continue;
         }
@@ -192,11 +252,13 @@ export function parseWidgets(pilrcText: string, form: ParsedFormHeader): ParsedW
             const at = parseAtSpec(line);
             const id = line.match(/\bBITMAP\s+(\d+)/i)?.[1];
             if (!at || id == null) continue;
+            const usable = !/\bNONUSABLE\b/i.test(line);
             widgets.push({
                 kind: "bitmap",
                 id: Number(id),
                 at: { x: getNumericPos(at.x), y: getNumericPos(at.y) },
-                hidden: /\bHIDDEN\b/i.test(line) || /\bNONUSABLE\b/i.test(line),
+                usable,
+                hidden: !usable || /\bHIDDEN\b/i.test(line),
             });
             continue;
         }
@@ -209,6 +271,8 @@ export function parseWidgets(pilrcText: string, form: ParsedFormHeader): ParsedW
                 m[1].replace(/\\r/g, "\r").replace(/\\n/g, "\n")
             );
             const visibleItems = line.match(/\bVISIBLEITEMS\s+(\d+)/i)?.[1];
+            const font = line.match(/\bFONT\s+(\d+)/i)?.[1];
+
             widgets.push({
                 kind: "list",
                 id: id != null ? Number(id) : undefined,
@@ -221,6 +285,9 @@ export function parseWidgets(pilrcText: string, form: ParsedFormHeader): ParsedW
                 items,
                 visibleItems: visibleItems != null ? Number(visibleItems) : undefined,
                 search: /\bSEARCH\b/i.test(line),
+                usable: !/\bNONUSABLE\b/i.test(line),
+                disabled: /\bDISABLED\b/i.test(line),
+                font: font != null ? Number(font) : undefined,
             });
             continue;
         }
@@ -326,6 +393,22 @@ export function parseWidgets(pilrcText: string, form: ParsedFormHeader): ParsedW
                     h: at.h ?? 0,
                 },
                 extended: /\bEXTENDED\b/i.test(line),
+            });
+            continue;
+        }
+
+        if (/^GRAFFITISTATEINDICATOR\b/i.test(line)) {
+            const at = parseAtSpec(line);
+            if (!at) continue;
+
+            widgets.push({
+                kind: "graffitistateindicator",
+                rect: {
+                    x: getNumericPos(at.x),
+                    y: getNumericPos(at.y),
+                    w: at.w ?? 9,  // PilRC standard GSI width
+                    h: at.h ?? 10, // PilRC standard GSI height
+                }
             });
             continue;
         }

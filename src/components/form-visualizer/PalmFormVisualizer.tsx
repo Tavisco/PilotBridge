@@ -84,7 +84,6 @@ export async function drawPalmOSText(
         isBold?: boolean;
     } = {}
 ): Promise<void> {
-    console.log(opts.isBold)
     const font = await loadPalmOSFont(opts.isBold? "/PalmOS-Bold.yaff" : "/PalmOS-Standard.yaff");
     const color = opts.color ?? "#000000";
     const scale = Math.max(1, Math.floor(opts.scale ?? 1));
@@ -328,36 +327,296 @@ export const PalmFormVisualizer = ({pilrcText, renderBitmap}: PalmFormVisualizer
                     }
 
                     case "button": {
-                        const bx = xOffset + w.rect?.x;
-                        const by = yOffset + w.rect?.y;
+                        const bx = xOffset + (w.rect?.x || 0);
+                        const by = yOffset + (w.rect?.y || 0);
                         const bw = w.rect?.w || 30;
                         const bh = w.rect?.h || 12;
 
-                        drawButtonRect(bx, by, bw, bh);
-
                         const rawText = w.text.replace(/\r/g, "\n");
                         const scale = 1;
-                        // TODO: Can button be bold?
-                        const textWidth = await measureTextWidth(rawText, scale, false);
+
+                        // Palm OS Font IDs: 1 and 7 are generally bold variants
+                        const isBold = w.font === 1 || w.font === 7;
+                        const textWidth = await measureTextWidth(rawText, scale, isBold);
                         const textHeight = fontStandard.lineHeight * scale; // 11px
 
-                        const textX = Math.round(bx + (bw - textWidth) / 2);
+                        ctx.fillStyle = "#000";
+                        ctx.strokeStyle = "#000";
+                        ctx.lineWidth = 1;
+
+                        // Helper for vertical text centering
                         const textTopY = Math.round(by + (bh - textHeight) / 2) - 1;
 
-                        await drawBitmapText(rawText, textX, textTopY, false);
+                        switch (w.style) {
+                            case "CHECKBOX": {
+                                // Draw 9x9 checkbox box
+                                const boxSize = 9;
+                                const boxY = Math.round(by + (bh - boxSize) / 2);
+                                ctx.strokeRect(bx + 0.5, boxY + 0.5, boxSize, boxSize);
+
+                                // Text is positioned to the right of the checkbox
+                                const textX = bx + boxSize + 4;
+                                await drawBitmapText(rawText, textX, textTopY, isBold);
+                                break;
+                            }
+
+                            case "POPUPTRIGGER": {
+                                // Popup triggers are generally left-aligned text with a trailing triangle
+                                const textX = bx;
+                                await drawBitmapText(rawText, textX, textTopY, isBold);
+
+                                // Draw the little downward pointing triangle next to the text
+                                const triX = textX + textWidth + 3;
+                                const triY = Math.round(by + bh / 2) - 1;
+                                ctx.beginPath();
+                                ctx.moveTo(triX, triY);
+                                ctx.lineTo(triX + 6, triY);
+                                ctx.lineTo(triX + 3, triY + 3);
+                                ctx.fill();
+                                break;
+                            }
+
+                            case "SELECTORTRIGGER": {
+                                // Selector triggers have a dotted/dashed bounding box
+                                const textX = Math.round(bx + (bw - textWidth) / 2);
+                                await drawBitmapText(rawText, textX, textTopY, isBold);
+
+                                ctx.setLineDash([1, 1]); // Dotted border
+                                ctx.strokeRect(bx, by + 0.5, bw - 1.5, bh);
+                                ctx.setLineDash([]);     // Reset
+                                break;
+                            }
+
+                            case "PUSHBUTTON": {
+                                // Pushbuttons traditionally have standard rectangular borders.
+                                // In a group, they touch borders, but drawn alone they are just stroked rects.
+                                ctx.strokeRect(bx - 1 + 0.5, by + 0.5 - 1, bw + 1, bh + 1);
+
+                                const textX = Math.round(bx + (bw - textWidth) / 2);
+                                await drawBitmapText(rawText, textX, textTopY, isBold);
+                                break;
+                            }
+
+                            case "BUTTON":
+                            case "REPEATBUTTON":
+                            default: {
+                                // Handle explicit framing
+                                if (w.frame === "NOFRAME") {
+                                    // Draw nothing around the text
+                                } else if (w.frame === "RECTFRAME") {
+                                    ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
+                                } else if (w.frame === "BOLDFRAME") {
+                                    ctx.fillRect(bx, by, bw, bh);
+                                    ctx.clearRect(bx + 2, by + 2, bw - 4, bh - 4);
+                                } else {
+                                    // "FRAME" or default falls back to standard rounded corners
+                                    drawButtonRect(bx, by, bw, bh);
+                                }
+
+                                const textX = Math.round(bx + (bw - textWidth) / 2);
+                                await drawBitmapText(rawText, textX, textTopY, isBold);
+                                break;
+                            }
+                        }
                         break;
                     }
 
-                    case "frame":
-                    case "rectangle":
-                    case "list":
-                    case "table":
-                    case "scrollbar":
-                    case "slider":
+                    case "frame": {
+                        if (w.usable === false) break;
+                        const rx = xOffset + (w.rect?.x || 0);
+                        const ry = yOffset + (w.rect?.y || 0);
+                        const rw = w.rect?.w || 0;
+                        const rh = w.rect?.h || 0;
+
+                        ctx.fillStyle = "#000";
                         ctx.strokeStyle = "#000";
-                        ctx.lineWidth = 2;
-                        ctx.strokeRect(xOffset + w.rect.x, yOffset + w.rect.y, w.rect.w, w.rect.h);
+
+                        // Handle alternative Palm OS frame styles if defined
+                        if (w.style === "DOUBLE" || w.frameType === "DOUBLE") {
+                            ctx.strokeRect(rx + 0.5, ry + 0.5, rw - 1, rh - 1);
+                            ctx.strokeRect(rx + 2.5, ry + 2.5, rw - 5, rh - 5);
+                        } else if (w.style === "BOLD" || w.frameType === "BOLD") {
+                            ctx.fillRect(rx, ry, rw, rh);
+                            ctx.clearRect(rx + 2, ry + 2, rw - 4, rh - 4);
+                        } else {
+                            // Standard 1px structural frame
+                            ctx.strokeRect(rx + 0.5, ry + 0.5, rw - 1, rh - 1);
+                        }
                         break;
+                    }
+
+                    case "rectangle": {
+                        if (w.usable === false) break;
+                        const rx = xOffset + (w.rect?.x || 0);
+                        const ry = yOffset + (w.rect?.y || 0);
+                        const rw = w.rect?.w || 0;
+                        const rh = w.rect?.h || 0;
+
+                        ctx.fillStyle = "#000";
+                        ctx.strokeStyle = "#000";
+
+                        if (w.filled || w.style === "FILLED") {
+                            ctx.fillRect(rx, ry, rw, rh);
+                        } else {
+                            ctx.strokeRect(rx + 0.5, ry + 0.5, rw - 1, rh - 1);
+                        }
+                        break;
+                    }
+
+                    case "list": {
+                        if (w.usable === false) break;
+                        const rx = xOffset + (w.rect?.x || 0);
+                        const ry = yOffset + (w.rect?.y || 0);
+                        const rw = w.rect?.w || 0;
+                        const rh = w.rect?.h || 0;
+
+                        ctx.strokeStyle = "#000";
+                        ctx.strokeRect(rx + 0.5, ry + 0.5, rw - 1, rh - 1);
+
+                        // If items array is present, populate the list text matching 11px row layout
+                        if (w.items && Array.isArray(w.items)) {
+                            let itemY = ry + 2;
+                            const isBold = w.font === 1 || w.font === 7;
+
+                            for (let i = 0; i < w.items.length; i++) {
+                                if (itemY + 11 > ry + rh) break; // Row boundary clip
+
+                                // Render simple placeholder list textual selection background if needed
+                                if (i === w.selectedIndex) {
+                                    ctx.fillStyle = "#000";
+                                    ctx.fillRect(rx + 1, itemY - 1, rw - 2, 12);
+                                    // Invert/draw selection text if your drawBitmapText supports coloring,
+                                    // or fall back to native standard rendering context
+                                }
+
+                                await drawBitmapText(w.items[i], rx + 4, itemY, isBold);
+                                itemY += 12; // Palm OS standard row interval increment
+                            }
+                        }
+                        break;
+                    }
+
+                    case "table": {
+                        if (w.usable === false) break;
+                        const rx = xOffset + (w.rect?.x || 0);
+                        const ry = yOffset + (w.rect?.y || 0);
+                        const rw = w.rect?.w || 0;
+                        const rh = w.rect?.h || 0;
+
+                        ctx.fillStyle = "#000";
+                        ctx.strokeStyle = "#000";
+
+                        // Draw outer containing boundary
+                        ctx.strokeRect(rx + 0.5, ry + 0.5, rw - 1, rh - 1);
+
+                        // Palm OS tables don't automatically render thick grids,
+                        // but they define structural layout row cuts (traditionally ~12px intervals)
+                        const rowHeight = 12;
+                        for (let y = ry + rowHeight; y < ry + rh - 2; y += rowHeight) {
+                            ctx.fillRect(rx, y, rw, 1);
+                        }
+                        break;
+                    }
+
+                    case "scrollbar": {
+                        if (w.usable === false) break;
+                        const rx = xOffset + (w.rect?.x || 0);
+                        const ry = yOffset + (w.rect?.y || 0);
+                        const rw = w.rect?.w || 7; // Default Palm OS scrollbar width is 7px
+                        const rh = w.rect?.h || 0;
+
+                        ctx.fillStyle = "#000";
+                        ctx.strokeStyle = "#000";
+
+                        // 1. Draw outer boundary vertical shaft
+                        ctx.strokeRect(rx + 0.5, ry + 0.5, rw - 1, rh - 1);
+
+                        // 2. Button segments bounds (Top & Bottom squares)
+                        const btnSize = rw;
+                        ctx.fillRect(rx, ry + btnSize, rw, 1);              // Top cap divider
+                        ctx.fillRect(rx, ry + rh - btnSize - 1, rw, 1);     // Bottom cap divider
+
+                        // 3. Render Top Arrow (Up Triangle)
+                        ctx.beginPath();
+                        ctx.moveTo(rx + Math.floor(rw / 2) + 0.5, ry + 2);
+                        ctx.lineTo(rx + 1.5, ry + btnSize - 3);
+                        ctx.lineTo(rx + rw - 1.5, ry + btnSize - 3);
+                        ctx.closePath();
+                        ctx.fill();
+
+                        // 4. Render Bottom Arrow (Down Triangle)
+                        ctx.beginPath();
+                        ctx.moveTo(rx + Math.floor(rw / 2) + 0.5, ry + rh - 3);
+                        ctx.lineTo(rx + 1.5, ry + rh - btnSize + 2);
+                        ctx.lineTo(rx + rw - 1.5, ry + rh - btnSize + 2);
+                        ctx.closePath();
+                        ctx.fill();
+
+                        // 5. Scrollbar central thumb elevator track indicator block
+                        const trackMaxH = rh - (btnSize * 2) - 4;
+                        const thumbH = Math.max(8, Math.round(trackMaxH * 0.35)); // Mock proportional height
+                        const thumbY = ry + btnSize + 2 + Math.round((trackMaxH - thumbH) * 0.2); // Proportional placement
+
+                        ctx.fillRect(rx + 1, thumbY, rw - 2, thumbH);
+                        break;
+                    }
+
+                    case "slider": {
+                        if (w.usable === false) break;
+                        const rx = xOffset + (w.rect?.x || 0);
+                        const ry = yOffset + (w.rect?.y || 0);
+                        const rw = w.rect?.w || 0;
+                        const rh = w.rect?.h || 12;
+
+                        ctx.fillStyle = "#000";
+                        ctx.strokeStyle = "#000";
+
+                        // 1. Render core horizontal slider center line rail
+                        const trackY = Math.round(ry + rh / 2) - 1;
+                        ctx.fillRect(rx, trackY, rw, 1);
+
+                        // 2. Render slider thumb knob control mechanism box (centered in track rail)
+                        const thumbW = w.thumbWidth || 8;
+                        const thumbH = w.thumbHeight || 8;
+                        const thumbX = Math.round(rx + (rw - thumbW) / 2); // Placed at center by default
+                        const thumbYPos = Math.round(trackY - (thumbH / 2)) + 0.5;
+
+                        // Clear line segment hidden directly underneath the active slider control knob
+                        ctx.clearRect(thumbX, Math.floor(thumbYPos), thumbW, thumbH);
+
+                        // Draw distinct 1-bit square slider thumb frame
+                        ctx.strokeRect(thumbX + 0.5, thumbYPos, thumbW - 1, thumbH - 1);
+
+                        // Add central pixel anchor core accent inside control knob
+                        ctx.fillRect(thumbX + Math.floor(thumbW / 2) - 1, Math.floor(thumbYPos + thumbH / 2) - 1, 2, 2);
+                        break;
+                    }
+
+                    case "graffitistateindicator": {
+                        // Use coordinates if explicitly given, otherwise fall back to standard Palm OS sizes
+                        const gx = xOffset + (w.rect?.x || 0);
+                        const gy = yOffset + (w.rect?.y || 0);
+                        const gw = w.rect?.w || 9;  // kGsiWidth from pilrc.h
+                        const gh = w.rect?.h || 10; // kGsiHeight from pilrc.h
+
+                        ctx.fillStyle = "#000";
+                        ctx.strokeStyle = "#000";
+                        ctx.lineWidth = 1;
+
+                        // 1. Draw the classic Palm OS GSI baseline / housing container
+                        // It traditionally appears as a small 1-bit dotted or solid minimal target layout.
+                        // For a clean retro-accurate representation, we draw the baseline marker:
+                        ctx.fillRect(gx, gy + gh - 1, 3, 1);
+                        ctx.fillRect(gx + gw - 3, gy + gh - 1, 3, 1);
+
+                        ctx.beginPath();
+                        ctx.moveTo(gx + Math.floor(gw / 2) + 0.5, gy + 1);
+                        ctx.lineTo(gx + 1, gy + gh - 4);
+                        ctx.lineTo(gx + gw - 1, gy + gh - 4);
+                        ctx.closePath();
+                        ctx.fill();
+                        break;
+                    }
 
                     case "gadget":
                         ctx.fillStyle = "rgba(0,0,0,0.05)";

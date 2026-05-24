@@ -51,13 +51,12 @@ export function parseControl(reader: PalmBinaryReader, offset: number) {
 
     const usable = !!(attrWord & 0x8000);
     const enabled = !!(attrWord & 0x4000);
-    const visible = !!(attrWord & 0x2000);
     const on = !!(attrWord & 0x1000);
     const leftAnchor = !!(attrWord & 0x0800);
     const frame = (attrWord >> 8) & 0x07;
 
     const text = readCStringAtOffset(reader, offset + 20);
-    return { id, rect, style, font, group, text, usable, enabled, visible, on, leftAnchor, frame };
+    return { id, rect, style, font, group, text, usable, enabled, on, leftAnchor, frame };
 }
 
 export function parseFormBitmap(reader: PalmBinaryReader, offset: number) {
@@ -76,9 +75,25 @@ export function parseField(reader: PalmBinaryReader, offset: number) {
         w: reader.i16be(offset + 6),
         h: reader.i16be(offset + 8),
     };
-    // maxChars is at a fixed offset (see original comment)
+
+    const attrWord = reader.u16be(offset + 10);
     const maxChars = reader.u16be(offset + 28);
-    return { id, rect, maxChars };
+    const font = reader.u8(offset + 38);
+
+    return {
+        id, rect,
+        usable: !!(attrWord & 0x8000),
+        editable: !!(attrWord & 0x2000),
+        singleLine: !!(attrWord & 0x1000),
+        dynamicSize: !!(attrWord & 0x0400),
+        underlined: (attrWord & 0x00C0) !== 0,
+        justification: (attrWord & 0x0030) >> 4,
+        autoShift: !!(attrWord & 0x0008),
+        hasScrollBar: !!(attrWord & 0x0004),
+        numeric: !!(attrWord & 0x0002),
+        maxChars,
+        font
+    };
 }
 
 // --- helper string / formatting ---
@@ -204,6 +219,42 @@ function parseFormHeader68K(reader: PalmBinaryReader) {
     };
 }
 
+export function parseList(reader: PalmBinaryReader, offset: number) {
+    const id = reader.u16be(offset);
+    const rect: RectLike = {
+        x: reader.i16be(offset + 2),
+        y: reader.i16be(offset + 4),
+        w: reader.i16be(offset + 6),
+        h: reader.i16be(offset + 8),
+    };
+
+    const attrWord = reader.u16be(offset + 10);
+    // offset + 12 is itemsText (4 byte pointer, usually NULL)
+    const numItems = reader.u16be(offset + 16);
+    // offset + 18 is currentItem (2 bytes)
+    // offset + 20 is topItem (2 bytes)
+    const font = reader.u8(offset + 22);
+
+    const usable = !!(attrWord & 0x8000);
+    const enabled = !!(attrWord & 0x4000);
+    const hasScrollBar = !!(attrWord & 0x0800);
+    const search = !!(attrWord & 0x0400); // Incremental search flag
+
+    // Read the array of items
+    const items: string[] = [];
+    // The strings start immediately after the 32-byte base struct
+    // + (numItems * 4 bytes) for the text handle array block.
+    let stringOffset = offset + 32 + (numItems * 4);
+
+    for (let i = 0; i < numItems; i++) {
+        const str = readCStringAtOffset(reader, stringOffset);
+        items.push(str);
+        stringOffset += str.length + 1; // advance past string and null terminator
+    }
+
+    return { id, rect, usable, enabled, hasScrollBar, search, font, numItems, items };
+}
+
 // --- main tFRM decompiler ---
 export function decodeTFRM(
     data: Uint8Array | number[] | ArrayBuffer,
@@ -217,15 +268,19 @@ export function decodeTFRM(
     const lines: string[] = [];
     lines.push(`FORM ID ${resourceId} AT ${fmtBounds(form.bounds)}`);
 
-    if (form.frameWidth > 0) lines.push("\tFRAME");
-    if (form.modal) lines.push("\tMODAL");
+    const formProps: string[] = [];
+    if ((form.frameWidth & 0x03) > 0) formProps.push("FRAME");
+    else formProps.push("NOFRAME");
+
+    if (form.saveBehind) formProps.push("SAVEBEHIND");
+    if (form.usable) formProps.push("USABLE");
+    if (form.modal) formProps.push("MODAL");
+
+    if (formProps.length > 0) lines.push(`\t${formProps.join(" ")}`);
+
     if (form.defaultBtnId > 0) lines.push(`\tDEFAULTBTNID ${form.defaultBtnId}`);
     if (form.helpRscId > 0) lines.push(`\tHELPID ${form.helpRscId}`);
     if (form.menuRscId > 0) lines.push(`\tMENUID ${form.menuRscId}`);
-
-    // Do not print defaults unless they are explicitly disabled.
-    if (!form.usable) lines.push("\tNONUSABLE");
-    if (!form.saveBehind) lines.push("\tNOSAVEBEHIND");
 
     lines.push("BEGIN");
 
@@ -244,79 +299,116 @@ export function decodeTFRM(
     for (const obj of objects) {
         let line = "";
         switch (obj.type) {
-            case 9: {
+            case 9: { // frmTitleObj
                 const t = parseTitle(reader, obj.offset);
                 line = `TITLE "${escapeQuotedText(t.text)}"`;
                 break;
             }
-            case 8: {
+            case 8: { // frmLabelObj
                 const l = parseLabel(reader, obj.offset);
                 const parts = [
                     `LABEL "${escapeQuotedText(l.text)}"`,
                     `ID ${l.id}`,
                     `AT (${l.pos.x} ${l.pos.y})`,
                 ];
+                parts.push(l.usable ? "USABLE" : "NONUSABLE");
                 if (l.font > 0) parts.push(`FONT ${l.font}`);
                 line = parts.join(" ");
                 break;
             }
-            case 0: {
-                const c = parseControl(reader, obj.offset);
+            case 0: { // frmFieldObj
+                const c = parseField(reader, obj.offset);
                 const parts = [
-                    `FIELD `,
-                    `ID ${c.id}`,
-                    `AT ${fmtBounds(c.rect, form.bounds)}`,
+                    `FIELD ID ${c.id} AT ${fmtBounds(c.rect, form.bounds)}`,
                 ];
-                if (!c.usable) parts.push("NONUSABLE");
-                if (!c.enabled) parts.push("DISABLED");
-                if (!c.visible) parts.push("HIDDEN");
-                if (c.on) parts.push("ON");
-                if (!c.leftAnchor) parts.push("RIGHTANCHOR");
-                if (c.frame === 0) parts.push("NOFRAME");
-                else if (c.frame === 2) parts.push("BOLDFRAME");
-                else if (c.frame === 3) parts.push("RECTFRAME");
+                parts.push(c.usable ? "USABLE" : "NONUSABLE");
+
+                if (c.justification === 0) parts.push("LEFTALIGN");
+                else if (c.justification === 1) parts.push("CENTERALIGN");
+                else if (c.justification === 2) parts.push("RIGHTALIGN");
+
+                parts.push(c.editable ? "EDITABLE" : "NONEDITABLE");
+                if (c.underlined) parts.push("UNDERLINED");
+                if (c.singleLine) parts.push("SINGLELINE"); else parts.push("MULTIPLELINES");
+                if (c.dynamicSize) parts.push("DYNAMICSIZE");
+                if (c.autoShift) parts.push("AUTOSHIFT");
+                if (c.hasScrollBar) parts.push("HASSCROLLBAR");
+                if (c.numeric) parts.push("NUMERIC");
+
+                if (c.maxChars > 0) parts.push(`MAXCHARS ${c.maxChars}`);
+                if (c.font > 0) parts.push(`FONT ${c.font}`);
                 line = parts.join(" ");
                 break;
             }
-            case 1: {
+            case 1:
+            case 15: { // frmControlObj & frmGraphicalControlObj
                 const c = parseControl(reader, obj.offset);
+                const styleName = ["BUTTON", "PUSHBUTTON", "CHECKBOX", "POPUPTRIGGER", "SELECTORTRIGGER", "REPEATBUTTON", "SLIDER", "FEEDBACKSLIDER"][c.style] || "BUTTON";
                 const parts = [
-                    `BUTTON "${escapeQuotedText(c.text)}"`,
+                    `${styleName} "${escapeQuotedText(c.text)}"`,
                     `ID ${c.id}`,
                     `AT ${fmtBounds(c.rect, form.bounds)}`,
                 ];
-                if (!c.usable) parts.push("NONUSABLE");
+
+                parts.push(c.usable ? "USABLE" : "NONUSABLE");
                 if (!c.enabled) parts.push("DISABLED");
-                if (!c.visible) parts.push("HIDDEN");
-                if (c.on) parts.push("ON");
-                if (!c.leftAnchor) parts.push("RIGHTANCHOR");
-                if (c.frame === 0) parts.push("NOFRAME");
-                else if (c.frame === 2) parts.push("BOLDFRAME");
-                else if (c.frame === 3) parts.push("RECTFRAME");
+                if (c.leftAnchor) parts.push("LEFTANCHOR"); else parts.push("RIGHTANCHOR");
+
+                // PilRC natively implies defaults for certain control boundaries;
+                // we explicitly write them here if they deviate from the default.
+                if (c.style === 0) {
+                    if (c.frame === 0) parts.push("NOFRAME");
+                    else if (c.frame === 1) parts.push("FRAME");
+                    else if (c.frame === 2) parts.push("BOLDFRAME");
+                    else if (c.frame === 3) parts.push("RECTFRAME");
+                } else {
+                    const defaultFrame = (c.style === 2 || c.style === 3) ? 0 : 1;
+                    if (c.frame !== defaultFrame) {
+                        if (c.frame === 0) parts.push("NOFRAME");
+                        else if (c.frame === 1) parts.push("FRAME");
+                        else if (c.frame === 2) parts.push("BOLDFRAME");
+                        else if (c.frame === 3) parts.push("RECTFRAME");
+                    }
+                }
+
+                // Include explicit group rendering for eligible controls
+                if (c.style === 1 || c.style === 2) {
+                    parts.push(`GROUP ${c.group}`);
+                }
+
+                if (c.font > 0) parts.push(`FONT ${c.font}`);
                 line = parts.join(" ");
                 break;
             }
-            case 2: {
-                const c = parseControl(reader, obj.offset);
-                const parts = [
-                    `LIST "${escapeQuotedText(c.text)}"`,
-                    `ID ${c.id}`,
-                    `AT ${fmtBounds(c.rect, form.bounds)}`,
-                ];
-                if (!c.usable) parts.push("NONUSABLE");
-                if (!c.enabled) parts.push("DISABLED");
-                if (!c.visible) parts.push("HIDDEN");
-                if (c.on) parts.push("ON");
-                if (!c.leftAnchor) parts.push("RIGHTANCHOR");
-                if (c.frame === 0) parts.push("NOFRAME");
-                else if (c.frame === 2) parts.push("BOLDFRAME");
-                else if (c.frame === 3) parts.push("RECTFRAME");
+            case 11: { // frmGraffitiStateObj
+                const pos = { x: reader.i16be(obj.offset), y: reader.i16be(obj.offset + 2) };
+                line = `GRAFFITISTATEINDICATOR AT (${pos.x} ${pos.y})`;
+                break;
+            }
+            case 2: { // frmListObj
+                const lst = parseList(reader, obj.offset);
+                const parts = ["LIST"];
+
+                parts.push(`ID ${lst.id}`);
+                parts.push(`AT ${fmtBounds(lst.rect, form.bounds)}`);
+
+                parts.push(lst.usable ? "USABLE" : "NONUSABLE");
+                if (!lst.enabled) parts.push("DISABLED");
+                if (lst.hasScrollBar) parts.push("HASSCROLLBAR");
+                if (lst.search) parts.push("SEARCH");
+                if (lst.font > 0) parts.push(`FONT ${lst.font}`);
+
                 line = parts.join(" ");
                 break;
             }
-            case 4: {
+            case 4: { // frmBitmapObj
                 const bm = parseFormBitmap(reader, obj.offset);
-                line = `FORMBITMAP AT (${bm.pos.x} ${bm.pos.y}) BITMAP ${bm.rscID}`;
+                const parts = [
+                    `FORMBITMAP AT (${bm.pos.x} ${bm.pos.y})`,
+                    `BITMAP ${bm.rscID}`
+                ];
+                parts.push(bm.usable ? "USABLE" : "NONUSABLE");
+                line = parts.join(" ");
                 break;
             }
             default:
