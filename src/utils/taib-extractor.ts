@@ -615,7 +615,7 @@ export const extractTAIBResource = (
     }
 
     if (candidates.length === 0) {
-        dbg("No tAIB resource found in database", rawDb?.header?.name);
+        // dbg("No tAIB resource found in database", rawDb?.header?.name);
         return placeholderBitmap;
     }
 

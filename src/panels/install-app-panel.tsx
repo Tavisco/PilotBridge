@@ -3,8 +3,11 @@ import { useEffect, useState } from "react";
 import {
   Button, Box, List, ListItem, ListItemText,
   IconButton, ListItemIcon, PaperProps, Typography,
+  Dialog, DialogTitle, DialogContent,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import CloseIcon from "@mui/icons-material/Close";
 import { RawPdbDatabase, RawPrcDatabase } from "palm-pdb";
 
 import { Panel } from "../panel";
@@ -13,6 +16,8 @@ import hotsyncEvents, { HotsyncEvents } from "../event-emitter/hotsync-event-emi
 import { prefsStore } from "../prefs-store";
 import { extractTAIBResource } from "../utils/taib-extractor";
 import { PalmIcon } from "../components/PalmIcon.tsx";
+import {PrcExplorerPanel} from "./prc-explorer-panel.tsx";
+import {ManageSearch} from "@mui/icons-material";
 
 const dbStg = new WebDatabaseStorageImplementation();
 
@@ -20,6 +25,10 @@ export function InstallAppPanel(props: PaperProps) {
   const [hasValidUser, setHasValidUser] = useState<boolean>(true);
   const [filenames, setFilenames] = useState<string[]>([]);
   const [databasesState, setDatabasesState] = useState<(RawPdbDatabase | RawPrcDatabase)[]>([]);
+
+  // Pop‑up state
+  const [explorerOpen, setExplorerOpen] = useState(false);
+  const [selectedDb, setSelectedDb] = useState<RawPdbDatabase | RawPrcDatabase | null>(null);
 
   async function renderFiles() {
     const deviceName = prefsStore.get("selectedDevice") as string;
@@ -54,6 +63,15 @@ export function InstallAppPanel(props: PaperProps) {
     const deviceName = prefsStore.get("selectedDevice") as string;
     await dbStg.removeDatabaseBeforeInstallFromList(deviceName, filenames[index]);
     renderFiles();
+  };
+
+  const openExplorer = (db: RawPdbDatabase | RawPrcDatabase) => {
+    setSelectedDb(db);
+    setExplorerOpen(true);
+  };
+  const closeExplorer = () => {
+    setExplorerOpen(false);
+    setSelectedDb(null);
   };
 
   useEffect(() => {
@@ -100,9 +118,28 @@ export function InstallAppPanel(props: PaperProps) {
                   <ListItem
                       key={`${filename}-${index}`}
                       secondaryAction={
-                        <IconButton edge="end" aria-label="delete" onClick={() => handleRemoveFile(index)}>
-                          <DeleteIcon />
-                        </IconButton>
+                        <Box sx={{ display: "flex", gap: 0.5 }}>
+                          <IconButton
+                              edge="end"
+                              aria-label="open explorer"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openExplorer(db);
+                              }}
+                          >
+                            <ManageSearch />
+                          </IconButton>
+                          <IconButton
+                              edge="end"
+                              aria-label="delete"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemoveFile(index);
+                              }}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Box>
                       }
                   >
                     <ListItemIcon style={{ marginInlineEnd: "1em" }}>
@@ -114,6 +151,30 @@ export function InstallAppPanel(props: PaperProps) {
             })}
           </List>
         </Box>
+
+        {/* Explorer Pop‑up */}
+        <Dialog
+            open={explorerOpen}
+            onClose={closeExplorer}
+            fullWidth
+            maxWidth="xl"
+            PaperProps={{ sx: { height: "80vh" } }}
+        >
+          <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            Database Explorer
+            <IconButton onClick={closeExplorer} size="small">
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent dividers>
+            {selectedDb && (
+                <PrcExplorerPanel
+                    database={selectedDb}
+                    enableFileUpload={false}
+                />
+            )}
+          </DialogContent>
+        </Dialog>
       </Panel>
   );
 }
