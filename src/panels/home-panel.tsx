@@ -60,7 +60,7 @@ const setupSteps = [
 ];
 
 const changelogData = [
-    { version: '1.5.0', date: 'XXXX', changes: ['Add database explorer', 'Hotsync log can be toggled'] },
+    { version: '1.5.0', date: 'XXXX', changes: ['Add database explorer', 'Hotsync log can be toggled', 'Add theme selector'] },
     { version: '1.4.0', date: '2026-05-14', changes: ['Add Google Calendar sync', 'High resolution icons on app install'] },
     { version: '1.3.0', date: '2024-11-07', changes: ['Add To Do'] },
     { version: '1.2.0', date: '2024-09-08', changes: ['Add data export and import in the settings', 'Remove unimplemented functionality from the menu bar', 'New URL! https://pilotbridge.tavisco.dev/'] },

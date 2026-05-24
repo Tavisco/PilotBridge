@@ -682,8 +682,6 @@ export const PalmFormVisualizer = ({pilrcText, fetchBitmapData}: PalmFormVisuali
                                     imageRendering: "pixelated",
                                 }}
                             />
-
-
                         </Box>
                     </Box>
                 )}
