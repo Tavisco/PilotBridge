@@ -18,6 +18,10 @@ export const drawTAIBBitmap = (
     bitmap?: TAIBBitmap,
     scale = 2
 ) => {
+    if (!canvas || typeof canvas.getContext !== 'function') {
+        console.warn("drawTAIBBitmap requires a valid HTMLCanvasElement");
+        return;
+    }
     const bmp = bitmap ?? placeholderBitmap;
 
     const width = Number(bmp.width) || 0;
@@ -202,6 +206,19 @@ export const drawTAIBBitmap = (
 
     ctx.putImageData(imageData, 0, 0);
 };
+
+export function drawTAIBBitmapToCtx(
+    ctx: CanvasRenderingContext2D,
+    bitmap: any,
+    x: number,
+    y: number,
+    scale: number
+) {
+    // offscreen canvas element
+    const tempCanvas = document.createElement('canvas');
+    drawTAIBBitmap(tempCanvas, bitmap, scale);
+    ctx.drawImage(tempCanvas, x, y);
+}
 
 export const PalmIcon: React.FC<PalmIconProps> = ({
                                                       bitmap,

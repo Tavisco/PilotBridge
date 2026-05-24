@@ -67,6 +67,26 @@ export function PrcExplorerPanel({
 
     const activeDb = externalDb ?? localDb;
 
+    const handleGetBitmapData = (resourceId: number) => {
+        if (!activeDb || !activeDb.records) return null;
+
+        const imageRecord = (activeDb.records as ResourceRecord[]).find(
+            (r) => r.entry.resourceId === resourceId && (r.entry.type === "Tbmp" || r.entry.type === "tAIB")
+        );
+
+        if (!imageRecord) return null;
+
+        const decodedBitmaps = extractAllTAIBBitmapsFromResource(toUint8Array(imageRecord.data));
+
+        const targetBmp = decodedBitmaps
+            .filter((x) => x.density == 72)
+            .sort((a, b) => a < b ? 1 : -1)
+            .at(0);
+
+        // Return the raw data object, not <PalmIcon />
+        return targetBmp || null;
+    };
+
     const handleRenderFormBitmap = (resourceId: number) => {
         if (!activeDb || !activeDb.records) return null;
 
@@ -332,12 +352,11 @@ export function PrcExplorerPanel({
                                             </Typography>
                                         </Box>
 
-                                        {/* --- NEW DOWNLOAD BUTTON --- */}
                                         <Button
                                             variant="outlined"
                                             size="small"
                                             onClick={handleDownloadRecord}
-                                            startIcon={<SaveIcon />} // Optional: Un-comment if you imported a download icon
+                                            startIcon={<SaveIcon />}
                                         >
                                             Download
                                         </Button>
@@ -363,7 +382,7 @@ export function PrcExplorerPanel({
                                                 </Typography>
                                                 <PalmFormVisualizer
                                                     pilrcText={selectedTFRM}
-                                                    renderBitmap={handleRenderFormBitmap}
+                                                    fetchBitmapData={handleGetBitmapData}
                                                 />
                                             </Box>
                                         ) : selectedRecord.entry.type === "tSTR" || selectedRecord.entry.type === "tver" ? (

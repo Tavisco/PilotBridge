@@ -5,10 +5,11 @@ import {loadPalmOSFont, PalmFont, PalmGlyph} from "../../utils/yaff-font.ts";
 import {AtToken, parseFormHeader, parseWidgets} from "../../utils/pilrc-parser.ts";
 import Grid2 from "@mui/material/Grid2";
 import {PilrcTextVisualizer} from "./PilrcTextVisualizer.tsx";
+import {drawTAIBBitmapToCtx} from "../PalmIcon.tsx";
 
 export interface PalmFormVisualizerProps {
     pilrcText: string;
-    renderBitmap?: (id: number | string) => HTMLImageElement | string | null;
+    fetchBitmapData?: (id: number | string) => any | null;
 }
 
 function resolveCoord(
@@ -139,7 +140,7 @@ export async function measurePalmOSText(
     return {width: maxWidth, height};
 }
 
-export const PalmFormVisualizer = ({pilrcText, renderBitmap}: PalmFormVisualizerProps) => {
+export const PalmFormVisualizer = ({pilrcText, fetchBitmapData}: PalmFormVisualizerProps) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     const form = useMemo(() => {
@@ -598,12 +599,25 @@ export const PalmFormVisualizer = ({pilrcText, renderBitmap}: PalmFormVisualizer
                         ctx.setLineDash([]);
                         break;
 
+                    case "bitmap": {
+                        if (!fetchBitmapData) break;
+
+                        const targetBmp = fetchBitmapData(w.id);
+                        if (targetBmp) {
+                            const bitX = xOffset + w.at.x;
+                            const bitY = yOffset + w.at.y;
+
+                            drawTAIBBitmapToCtx(ctx, targetBmp, bitX, bitY, 1);
+                        }
+                        break;
+                    }
+
                 }
             }
         };
 
         render();
-    }, [form, renderBitmap, formBounds]);
+    }, [form, fetchBitmapData, formBounds]);
 
     return (
         <Grid2 container spacing={2}>
@@ -649,32 +663,7 @@ export const PalmFormVisualizer = ({pilrcText, renderBitmap}: PalmFormVisualizer
                                 }}
                             />
 
-                            <Box
-                                position="absolute"
-                                top={0}
-                                left={0}
-                                width="100%"
-                                height="100%"
-                                sx={{ pointerEvents: "none" }}
-                            >
-                                {form.widgets
-                                    .filter((w) => w.kind === "bitmap")
-                                    .map((w) => {
-                                        const bitX = w.at.x + formBounds.x;
-                                        const bitY = w.at.y + formBounds.y - 6;
 
-                                        return (
-                                            <Box
-                                                key={`bitmap-${w.id}-${bitX}-${bitY}`}
-                                                position="absolute"
-                                                left={bitX}
-                                                top={bitY}
-                                            >
-                                                {renderBitmap ? renderBitmap(w.id) : null}
-                                            </Box>
-                                        );
-                                    })}
-                            </Box>
                         </Box>
                     </Box>
                 )}
