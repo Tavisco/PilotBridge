@@ -204,8 +204,8 @@ export function PrcExplorerPanel({
         <Panel
             title={
                 activeDb
-                    ? `${activeDb.header?.name ?? "Database"} - PRC Explorer`
-                    : "PRC Explorer"
+                    ? `${activeDb.header?.name ?? "Database"} - Database Explorer`
+                    : "Database Explorer"
             }
             isExpandedByDefault
             {...panelProps}
@@ -225,7 +225,7 @@ export function PrcExplorerPanel({
                                 type="file"
                                 hidden
                                 onChange={handleInspectFileChange}
-                                accept=".prc,.pdb"
+                                accept=".prc,.pdb,.PRC,.PDB"
                             />
                         </Button>
                     )}

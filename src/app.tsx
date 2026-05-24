@@ -221,7 +221,7 @@ export function App() {
               <ListItemIcon>
                 <ManageSearch />
               </ListItemIcon>
-              <ListItemText primary="Explore database" />
+              <ListItemText primary="Database explorer" />
             </ListItemButton>
           </ListItem>
           {/* <ListItem key="retrieve-app" disablePadding>
