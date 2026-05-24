@@ -422,7 +422,6 @@ export const PalmFormVisualizer = ({pilrcText, renderBitmap}: PalmFormVisualizer
                     }
 
                     case "frame": {
-                        if (w.usable === false) break;
                         const rx = xOffset + (w.rect?.x || 0);
                         const ry = yOffset + (w.rect?.y || 0);
                         const rw = w.rect?.w || 0;
@@ -431,22 +430,13 @@ export const PalmFormVisualizer = ({pilrcText, renderBitmap}: PalmFormVisualizer
                         ctx.fillStyle = "#000";
                         ctx.strokeStyle = "#000";
 
-                        // Handle alternative Palm OS frame styles if defined
-                        if (w.style === "DOUBLE" || w.frameType === "DOUBLE") {
-                            ctx.strokeRect(rx + 0.5, ry + 0.5, rw - 1, rh - 1);
-                            ctx.strokeRect(rx + 2.5, ry + 2.5, rw - 5, rh - 5);
-                        } else if (w.style === "BOLD" || w.frameType === "BOLD") {
-                            ctx.fillRect(rx, ry, rw, rh);
-                            ctx.clearRect(rx + 2, ry + 2, rw - 4, rh - 4);
-                        } else {
-                            // Standard 1px structural frame
-                            ctx.strokeRect(rx + 0.5, ry + 0.5, rw - 1, rh - 1);
-                        }
+                        // Standard 1px structural frame
+                        ctx.strokeRect(rx + 0.5, ry + 0.5, rw - 1, rh - 1);
+
                         break;
                     }
 
                     case "rectangle": {
-                        if (w.usable === false) break;
                         const rx = xOffset + (w.rect?.x || 0);
                         const ry = yOffset + (w.rect?.y || 0);
                         const rw = w.rect?.w || 0;
@@ -455,11 +445,7 @@ export const PalmFormVisualizer = ({pilrcText, renderBitmap}: PalmFormVisualizer
                         ctx.fillStyle = "#000";
                         ctx.strokeStyle = "#000";
 
-                        if (w.filled || w.style === "FILLED") {
-                            ctx.fillRect(rx, ry, rw, rh);
-                        } else {
-                            ctx.strokeRect(rx + 0.5, ry + 0.5, rw - 1, rh - 1);
-                        }
+                        ctx.strokeRect(rx + 0.5, ry + 0.5, rw - 1, rh - 1);
                         break;
                     }
 
@@ -481,14 +467,6 @@ export const PalmFormVisualizer = ({pilrcText, renderBitmap}: PalmFormVisualizer
                             for (let i = 0; i < w.items.length; i++) {
                                 if (itemY + 11 > ry + rh) break; // Row boundary clip
 
-                                // Render simple placeholder list textual selection background if needed
-                                if (i === w.selectedIndex) {
-                                    ctx.fillStyle = "#000";
-                                    ctx.fillRect(rx + 1, itemY - 1, rw - 2, 12);
-                                    // Invert/draw selection text if your drawBitmapText supports coloring,
-                                    // or fall back to native standard rendering context
-                                }
-
                                 await drawBitmapText(w.items[i], rx + 4, itemY, isBold);
                                 itemY += 12; // Palm OS standard row interval increment
                             }
@@ -497,7 +475,6 @@ export const PalmFormVisualizer = ({pilrcText, renderBitmap}: PalmFormVisualizer
                     }
 
                     case "table": {
-                        if (w.usable === false) break;
                         const rx = xOffset + (w.rect?.x || 0);
                         const ry = yOffset + (w.rect?.y || 0);
                         const rw = w.rect?.w || 0;
@@ -519,7 +496,6 @@ export const PalmFormVisualizer = ({pilrcText, renderBitmap}: PalmFormVisualizer
                     }
 
                     case "scrollbar": {
-                        if (w.usable === false) break;
                         const rx = xOffset + (w.rect?.x || 0);
                         const ry = yOffset + (w.rect?.y || 0);
                         const rw = w.rect?.w || 7; // Default Palm OS scrollbar width is 7px
@@ -562,7 +538,6 @@ export const PalmFormVisualizer = ({pilrcText, renderBitmap}: PalmFormVisualizer
                     }
 
                     case "slider": {
-                        if (w.usable === false) break;
                         const rx = xOffset + (w.rect?.x || 0);
                         const ry = yOffset + (w.rect?.y || 0);
                         const rw = w.rect?.w || 0;
@@ -576,8 +551,8 @@ export const PalmFormVisualizer = ({pilrcText, renderBitmap}: PalmFormVisualizer
                         ctx.fillRect(rx, trackY, rw, 1);
 
                         // 2. Render slider thumb knob control mechanism box (centered in track rail)
-                        const thumbW = w.thumbWidth || 8;
-                        const thumbH = w.thumbHeight || 8;
+                        const thumbW = 8;
+                        const thumbH = 8;
                         const thumbX = Math.round(rx + (rw - thumbW) / 2); // Placed at center by default
                         const thumbYPos = Math.round(trackY - (thumbH / 2)) + 0.5;
 
@@ -593,28 +568,23 @@ export const PalmFormVisualizer = ({pilrcText, renderBitmap}: PalmFormVisualizer
                     }
 
                     case "graffitistateindicator": {
-                        // Use coordinates if explicitly given, otherwise fall back to standard Palm OS sizes
                         const gx = xOffset + (w.rect?.x || 0);
                         const gy = yOffset + (w.rect?.y || 0);
-                        const gw = w.rect?.w || 9;  // kGsiWidth from pilrc.h
-                        const gh = w.rect?.h || 10; // kGsiHeight from pilrc.h
+                        const gw = w.rect?.w || 9;
+                        const gh = w.rect?.h || 10;
 
                         ctx.fillStyle = "#000";
                         ctx.strokeStyle = "#000";
                         ctx.lineWidth = 1;
 
-                        // 1. Draw the classic Palm OS GSI baseline / housing container
-                        // It traditionally appears as a small 1-bit dotted or solid minimal target layout.
-                        // For a clean retro-accurate representation, we draw the baseline marker:
-                        ctx.fillRect(gx, gy + gh - 1, 3, 1);
-                        ctx.fillRect(gx + gw - 3, gy + gh - 1, 3, 1);
-
                         ctx.beginPath();
-                        ctx.moveTo(gx + Math.floor(gw / 2) + 0.5, gy + 1);
-                        ctx.lineTo(gx + 1, gy + gh - 4);
-                        ctx.lineTo(gx + gw - 1, gy + gh - 4);
+                        ctx.moveTo(gx + Math.floor(gw / 2) + 0.5, gy);
+                        ctx.lineTo(gx, gy + gh - 5);
+                        ctx.lineTo(gx + gw, gy + gh - 5);
                         ctx.closePath();
                         ctx.fill();
+                        // Base bar element
+                        ctx.fillRect(gx + 2, gy + gh - 5, gw - 4, 5);
                         break;
                     }
 
@@ -691,7 +661,7 @@ export const PalmFormVisualizer = ({pilrcText, renderBitmap}: PalmFormVisualizer
                                     .filter((w) => w.kind === "bitmap")
                                     .map((w) => {
                                         const bitX = w.at.x + formBounds.x;
-                                        const bitY = w.at.y + formBounds.y;
+                                        const bitY = w.at.y + formBounds.y - 6;
 
                                         return (
                                             <Box
