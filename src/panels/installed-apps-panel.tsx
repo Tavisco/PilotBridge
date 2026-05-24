@@ -115,7 +115,7 @@ export function InstalledAppsPanel(props: PaperProps) {
                     <List dense>
                         {installedDatabases.length === 0 ? (
                             <Typography variant="body2" color="textSecondary" sx={{ fontStyle: "italic", p: 2 }}>
-                                No database records found matching criteria.
+                                No database records found.
                             </Typography>
                         ) : (
                             installedDatabases.map((db, index) => {

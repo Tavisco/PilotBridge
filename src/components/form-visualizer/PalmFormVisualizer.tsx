@@ -648,13 +648,14 @@ export const PalmFormVisualizer = ({pilrcText, fetchBitmapData}: PalmFormVisuali
                 {pilrcText && (
                     <Box
                         sx={{
-                            width: outerW,
-                            height: outerH,
+                            width: outerW + 4,
+                            height: outerH + 4,
                             display: "flex",
                             justifyContent: "center",
                             alignItems: "center",
-                            bgcolor: "#e0e0e0",
-                            borderRadius: 1,
+                            bgcolor: "#fff",
+                            border: "1px solid #fff",
+                            borderRadius: 0,
                         }}
                     >
                         <Box

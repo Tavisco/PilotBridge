@@ -10,7 +10,6 @@ export const PalmStringTableVisualizer = ({selectedTSTL}: PalmStringTableVisuali
         <Paper
             variant="outlined"
             sx={{
-                bgcolor: "#fafafa",
                 borderRadius: 1,
                 overflow: "hidden",
             }}
@@ -27,7 +26,6 @@ export const PalmStringTableVisualizer = ({selectedTSTL}: PalmStringTableVisuali
                                 py: 1,
                                 borderBottom: index < selectedTSTL.length - 1 ? "1px solid #e0e0e0" : "none",
                                 fontFamily: "monospace",
-                                "&:hover": {bgcolor: "#f0f0f0"}, // Nice hover effect per row
                             }}
                         >
                             <Typography

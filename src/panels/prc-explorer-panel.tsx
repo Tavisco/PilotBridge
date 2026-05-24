@@ -242,7 +242,7 @@ export function PrcExplorerPanel({
                         {/* Left sidebar: resource tree */}
                         <Grid2
                             size={{xs: 12, sm: 4}}
-                            sx={{borderRight: "1px solid #ccc", maxHeight: 500, overflowY: "auto", bgcolor: "#f9f9f9"}}
+                            sx={{borderRight: "1px solid #ccc", maxHeight: 500, overflowY: "auto"}}
                         >
                             <List dense component="nav">
                                 {Object.entries(groupedResources).map(([type, records]) => {
@@ -304,8 +304,7 @@ export function PrcExplorerPanel({
                                 maxHeight: 500,
                                 overflowY: "auto",
                                 display: "flex",
-                                flexDirection: "column",
-                                bgcolor: "#fff"
+                                flexDirection: "column"
                             }}
                         >
                             {selectedRecord ? (

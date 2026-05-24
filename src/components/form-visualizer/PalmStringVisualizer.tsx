@@ -10,7 +10,6 @@ export const PalmStringVisualizer = ({selectedTSTR}: PalmStringVisualizerProps) 
             variant="outlined"
             sx={{
                 p: 2,
-                bgcolor: "#fafafa",
                 borderRadius: 1,
                 fontFamily: "monospace",
                 whiteSpace: "pre-wrap",

@@ -14,7 +14,7 @@ const highlightPilrcLine = (line: string) => {
     }
 
     // Match keywords like FORM, BUTTON, AT, LEFT, ID, etc.
-    const keywordRegex = /\b(FORM|BUTTON|LABEL|FIELD|LIST|POPUPTRIGGER|SELECTORTRIGGER|CHECKBOX|BITMAP|FONT|MENU|TITLE|AT|LEFT|RIGHT|CENTER|BOTTOM|PREV|AUTO|ID|ALERT|VERSION|ICON|STRING|BEGIN|MODAL|MENUID|NOSAVEBEHIND|OBJECT|END|FRAME|DEFAULTBTNID|FORMBITMAP|DEFAULTBUTTON|INFORMATION|WARNING|ERROR|CONFIRMATION|MESSAGE|BUTTONS|PULLDOWN|MENUITEM|SEPARATOR|HIDDEN|NONUSABLE|NOFRAME|USABLE|LEFTALIGN|EDITABLE|UNDERLINED|SINGLELINE|AUTOSHIFT|MAXCHARS|LEFTANCHOR|GRAFFITISTATEINDICATOR|PUSHBUTTON|MULTIPLELINES|GROUP)\b/g;
+    const keywordRegex = /\b(FORM|BUTTON|LABEL|FIELD|LIST|POPUPTRIGGER|SELECTORTRIGGER|CHECKBOX|BITMAP|FONT|MENU|TITLE|AT|LEFT|RIGHT|CENTER|BOTTOM|PREV|AUTO|ID|ALERT|VERSION|ICON|STRING|BEGIN|MODAL|MENUID|NOSAVEBEHIND|OBJECT|END|FRAME|DEFAULTBTNID|FORMBITMAP|DEFAULTBUTTON|INFORMATION|WARNING|ERROR|CONFIRMATION|MESSAGE|BUTTONS|PULLDOWN|MENUITEM|SEPARATOR|HIDDEN|NONUSABLE|NOFRAME|USABLE|LEFTALIGN|EDITABLE|UNDERLINED|SINGLELINE|AUTOSHIFT|MAXCHARS|LEFTANCHOR|GRAFFITISTATEINDICATOR|PUSHBUTTON|MULTIPLELINES|GROUP|HELPID)\b/g;
 
     const parts = line.split(keywordRegex);
     return parts.map((part, index) => {
@@ -60,7 +60,6 @@ export const PilrcTextVisualizer = ({ pilrcText }: PilrcTextVisualizerProps) => 
             sx={{
                 borderRadius: 1,
                 overflow: "hidden",
-                bgcolor: "#f6f8fa",
                 borderColor: "divider"
             }}
         >
@@ -72,7 +71,6 @@ export const PilrcTextVisualizer = ({ pilrcText }: PilrcTextVisualizerProps) => 
                     alignItems: "center",
                     px: 2,
                     py: 0.5,
-                    bgcolor: "#eaeef2",
                     borderBottom: "1px solid",
                     borderColor: "divider"
                 }}
@@ -120,7 +118,7 @@ export const PilrcTextVisualizer = ({ pilrcText }: PilrcTextVisualizerProps) => 
                             {index + 1}
                         </Typography>
                         {/* Code Stream */}
-                        <Box sx={{ pl: 1, color: "#24292e" }}>
+                        <Box sx={{ pl: 1}}>
                             {highlightPilrcLine(line) || " "}
                         </Box>
                     </Stack>

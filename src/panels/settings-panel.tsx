@@ -45,14 +45,14 @@ export function SettingsPanel(props: PaperProps) {
                   <Tab icon={<PeopleIcon />} iconPosition="start" label="Users" value="users" />
                   <Tab icon={<SaveIcon />} iconPosition="start" label="Data" value="data" />
                   <Tab icon={<ScienceIcon />} iconPosition="start" label="Testing" value="testing" />
-                  <Tab icon={<CalendarMonthIcon />} iconPosition="start" label="Calendar" value="calendar" />
+                  {/*<Tab icon={<CalendarMonthIcon />} iconPosition="start" label="Calendar" value="calendar" />*/}
                   <Tab icon={<GoogleIcon />} iconPosition="start" label="Google Integration" value="google" />
                 </TabList>
               </Box>
               <TabPanel value="users"><ManagerUsersPanel /></TabPanel>
               <TabPanel value="data"><DataMgmtPanel /></TabPanel>
               <TabPanel value="testing"><TestPanel /></TabPanel>
-              <TabPanel value="calendar"><CalendarSettingsPanel /></TabPanel>
+              {/*<TabPanel value="calendar"><CalendarSettingsPanel /></TabPanel>*/}
               <TabPanel value="google"><GoogleSettingsPanel /></TabPanel>
             </TabContext>
           </div>

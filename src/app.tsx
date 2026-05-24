@@ -42,6 +42,7 @@ import { CalendarPanel } from "./panels/calendar-panel";
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import {ManageAppsPage} from "./panels/manage-apps.tsx";
 import {PrcExplorerPanel} from "./panels/prc-explorer-panel.tsx";
+import {ManageSearch} from "@mui/icons-material";
 
 
 function UnsupportedApisBanner() {
@@ -124,7 +125,7 @@ const ConnectionSelector = observer(function ConnectionSelector() {
 export function App() {
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [currentComponent, setCurrentComponent] = React.useState("home");
-  const [logVisible, setLogVisible] = React.useState(true);  // new state
+  const [logVisible, setLogVisible] = React.useState(false);
   const drawerWidth = 240;
 
   const handleDrawerToggle = () => {
@@ -218,7 +219,7 @@ export function App() {
                 onClick={() => handleListItemClick("explore")}
             >
               <ListItemIcon>
-                <InstallMobileIcon />
+                <ManageSearch />
               </ListItemIcon>
               <ListItemText primary="Explore database" />
             </ListItemButton>
