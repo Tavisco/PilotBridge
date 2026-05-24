@@ -378,13 +378,32 @@ export const PalmFormVisualizer = ({pilrcText, fetchBitmapData}: PalmFormVisuali
                             }
 
                             case "SELECTORTRIGGER": {
-                                // Selector triggers have a dotted/dashed bounding box
                                 const textX = Math.round(bx + (bw - textWidth) / 2);
                                 await drawBitmapText(rawText, textX, textTopY, isBold);
 
-                                ctx.setLineDash([1, 1]); // Dotted border
-                                ctx.strokeRect(bx, by + 0.5, bw - 1.5, bh);
-                                ctx.setLineDash([]);     // Reset
+                                // Manually draw a 1‑pixel dotted border around the rectangle
+                                ctx.fillStyle = "#000";
+                                const drawDot = (x: number, y: number) => {
+                                    ctx.fillRect(x, y, 1, 1);
+                                };
+
+                                // Top and bottom edges: draw dots every 2 pixels
+                                for (let x = bx + 2; x < bx + bw - 2; x += 2) {
+                                    drawDot(x, by);          // top
+                                    drawDot(x, by + bh - 1); // bottom
+                                }
+                                // Left and right edges (skip corners)
+                                for (let y = by + 2; y < by + bh - 2; y += 2) {
+                                    drawDot(bx, y);           // left
+                                    drawDot(bx + bw - 1, y);  // right
+                                }
+
+                                // Draw the four corners
+                                drawDot(bx, by);                     // top‑left
+                                drawDot(bx + bw - 1, by);           // top‑right
+                                drawDot(bx, by + bh - 1);           // bottom‑left
+                                drawDot(bx + bw - 1, by + bh - 1);  // bottom‑right
+
                                 break;
                             }
 
