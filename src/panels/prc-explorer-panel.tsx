@@ -76,6 +76,7 @@ export function PrcExplorerPanel({
 
         if (!imageRecord) return null;
 
+
         const decodedBitmaps = extractAllTAIBBitmapsFromResource(toUint8Array(imageRecord.data));
 
         const targetBmp = decodedBitmaps
@@ -85,34 +86,6 @@ export function PrcExplorerPanel({
 
         // Return the raw data object, not <PalmIcon />
         return targetBmp || null;
-    };
-
-    const handleRenderFormBitmap = (resourceId: number) => {
-        if (!activeDb || !activeDb.records) return null;
-
-        // Look up the specific record by the resourceId extracted from the PilRC text
-        const imageRecord = (activeDb.records as ResourceRecord[]).find(
-            (r) => r.entry.resourceId === resourceId && (r.entry.type === "Tbmp" || r.entry.type === "tAIB")
-        );
-
-        if (!imageRecord) {
-            return null; // Will fallback to the green placeholder block
-        }
-
-        // Decode the raw buffer using the already imported extractor
-        const decodedBitmaps = extractAllTAIBBitmapsFromResource(toUint8Array(imageRecord.data));
-
-        // Forms usually use the first bitmap variant
-        const targetBmp = decodedBitmaps
-            .filter((x) => x.density == 72)
-            .sort((a, b) => a < b ? 1 : -1)
-            .at(0);
-
-        if (!targetBmp) {
-            return null;
-        }
-
-        return <PalmIcon bitmap={targetBmp} scale={1}/>;
     };
 
     // --- file upload (only used when enableFileUpload is true) ---

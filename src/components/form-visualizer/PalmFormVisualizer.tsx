@@ -363,17 +363,18 @@ export const PalmFormVisualizer = ({pilrcText, fetchBitmapData}: PalmFormVisuali
 
                             case "POPUPTRIGGER": {
                                 // Popup triggers are generally left-aligned text with a trailing triangle
-                                const textX = bx;
-                                await drawBitmapText(rawText, textX, textTopY, isBold);
-
-                                // Draw the little downward pointing triangle next to the text
-                                const triX = textX + textWidth + 3;
+                                const triX = bx;
                                 const triY = Math.round(by + bh / 2) - 1;
+
                                 ctx.beginPath();
                                 ctx.moveTo(triX, triY);
                                 ctx.lineTo(triX + 6, triY);
                                 ctx.lineTo(triX + 3, triY + 3);
                                 ctx.fill();
+
+                                // Then draw the text after the triangle
+                                const textX = triX + 9;
+                                await drawBitmapText(rawText, textX, textTopY, isBold);
                                 break;
                             }
 
@@ -620,7 +621,6 @@ export const PalmFormVisualizer = ({pilrcText, fetchBitmapData}: PalmFormVisuali
 
                     case "bitmap": {
                         if (!fetchBitmapData) break;
-
                         const targetBmp = fetchBitmapData(w.id);
                         if (targetBmp) {
                             const bitX = xOffset + w.at.x;
