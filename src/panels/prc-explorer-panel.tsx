@@ -163,7 +163,7 @@ export function PrcExplorerPanel({
     const selectedBitmaps = useMemo(() => {
         if (!selectedRecord || (selectedRecord.entry.type !== "Tbmp" && selectedRecord.entry.type !== "tAIB"))
             return [];
-        return extractAllTAIBBitmapsFromResource(toUint8Array(selectedRecord.data));
+        return extractAllTAIBBitmapsFromResource(toUint8Array(selectedRecord.data)).reverse();
     }, [selectedRecord]);
 
     const selectedMBAR = useMemo(() => {
