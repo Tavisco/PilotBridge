@@ -152,7 +152,7 @@ export function DataMgmtPanel() {
                         variant="contained"
                         fullWidth
                     >
-                        Create data backup
+                        Download data backup
                     </LoadingButton>
                 </Grid2>
                 {isWide && <Grid2 size={{ xs: 12 }} />}

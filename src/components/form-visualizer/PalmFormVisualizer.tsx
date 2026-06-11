@@ -210,16 +210,66 @@ export const PalmFormVisualizer = ({pilrcText, fetchBitmapData}: PalmFormVisuali
                 ctx.fillStyle = "#000";
 
                 // 1. Draw main edges
-                ctx.fillRect(x + 2, y, w - 4, 1);             // Top
-                ctx.fillRect(x + 2, y + h - 1, w - 4, 1);     // Bottom
-                ctx.fillRect(x, y + 2, 1, h - 4);             // Left
-                ctx.fillRect(x + w - 1, y + 2, 1, h - 4);     // Right
+                ctx.fillRect(x + 3, y, w - 6, 1);             // Top
+                ctx.fillRect(x + 3, y + h - 1, w - 6, 1);     // Bottom
+                ctx.fillRect(x, y + 3, 1, h - 6);             // Left
+                ctx.fillRect(x + w - 1, y + 3, 1, h - 6);     // Right
 
-                // 2. Draw the transitional corner pixels
-                ctx.fillRect(x + 1, y + 1, 1, 1);             // Top-Left
-                ctx.fillRect(x + w - 2, y + 1, 1, 1);         // Top-Right
-                ctx.fillRect(x + 1, y + h - 2, 1, 1);         // Bottom-Left
-                ctx.fillRect(x + w - 2, y + h - 2, 1, 1);     // Bottom-Right
+                // 2. Draw the transitional corners
+                // Top-Left
+                ctx.fillRect(x + 2, y + 1, 1, 1);
+                ctx.fillRect(x + 1, y + 1, 1, 1);
+                ctx.fillRect(x + 1, y + 2, 1, 1);
+
+                // Top-Right
+                ctx.fillRect(x + w - 2, y + 1, 1, 1);
+                ctx.fillRect(x + w - 3, y + 1, 1, 1);
+                ctx.fillRect(x + w - 2, y + 2, 1, 1);
+
+                // Bottom-Left
+                ctx.fillRect(x + 1, y + h - 2, 1, 1);
+                ctx.fillRect(x + 1, y + h - 3, 1, 1);
+                ctx.fillRect(x + 2, y + h - 2, 1, 1);
+
+                // Bottom-Right
+                ctx.fillRect(x + w - 2, y + h - 2, 1, 1);
+                ctx.fillRect(x + w - 2, y + h - 3, 1, 1);
+                ctx.fillRect(x + w - 3, y + h - 2, 1, 1);
+            };
+
+            const drawBoldButtonRect = (x: number, y: number, w: number, h: number) => {
+                ctx.fillStyle = "#000";
+
+                // 1. Draw main edges
+                ctx.fillRect(x + 3, y-1, w - 6, 2);             // Top
+                ctx.fillRect(x + 3, y + h - 1, w - 6, 2);     // Bottom
+                ctx.fillRect(x-1, y + 3, 2, h - 6);             // Left
+                ctx.fillRect(x + w - 1, y + 3, 2, h - 6);     // Right
+
+                // 2. Draw the transitional corners
+                // Top-Left
+                ctx.fillRect(x + 2, y - 1, 1, 1);
+                ctx.fillRect(x + 1, y, 2, 1);
+                ctx.fillRect(x, y + 1, 3, 1);
+                ctx.fillRect(x - 1, y + 2, 3, 1);
+
+                // Top-Right
+                ctx.fillRect(x + w - 3, y - 1, 1, 1);
+                ctx.fillRect(x + w - 3, y, 2, 1);
+                ctx.fillRect(x + w - 3, y + 1, 3, 1);
+                ctx.fillRect(x + w - 2, y + 2, 3, 1);
+
+                // Bottom-Left
+                ctx.fillRect(x - 1, y + h - 3, 3, 1);
+                ctx.fillRect(x, y + h - 2, 3, 1);
+                ctx.fillRect(x + 1, y + h - 1, 2, 1);
+                ctx.fillRect(x + 2, y + h, 1, 1);
+
+                // Bottom-Right
+                ctx.fillRect(x + w - 2, y + h - 3, 3, 1);
+                ctx.fillRect(x + w - 3, y + h - 2, 3, 1);
+                ctx.fillRect(x + w - 3, y + h - 1, 2, 1);
+                ctx.fillRect(x + w - 3, y + h, 1, 1);
             };
 
             if (form.header.modal) {
@@ -409,10 +459,7 @@ export const PalmFormVisualizer = ({pilrcText, fetchBitmapData}: PalmFormVisuali
                             }
 
                             case "PUSHBUTTON": {
-                                // Pushbuttons traditionally have standard rectangular borders.
-                                // In a group, they touch borders, but drawn alone they are just stroked rects.
                                 ctx.strokeRect(bx - 1 + 0.5, by + 0.5 - 1, bw + 1, bh + 1);
-
                                 const textX = Math.round(bx + (bw - textWidth) / 2);
                                 await drawBitmapText(rawText, textX, textTopY, isBold);
                                 break;
@@ -421,16 +468,14 @@ export const PalmFormVisualizer = ({pilrcText, fetchBitmapData}: PalmFormVisuali
                             case "BUTTON":
                             case "REPEATBUTTON":
                             default: {
-                                // Handle explicit framing
                                 if (w.frame === "NOFRAME") {
                                     // Draw nothing around the text
                                 } else if (w.frame === "RECTFRAME") {
                                     ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
                                 } else if (w.frame === "BOLDFRAME") {
-                                    ctx.fillRect(bx, by, bw, bh);
-                                    ctx.clearRect(bx + 2, by + 2, bw - 4, bh - 4);
+                                    drawBoldButtonRect(bx, by, bw, bh);
                                 } else {
-                                    // "FRAME" or default falls back to standard rounded corners
+                                    // Default button
                                     drawButtonRect(bx, by, bw, bh);
                                 }
 
