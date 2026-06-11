@@ -200,6 +200,8 @@ export function PrcExplorerPanel({
     const toggleTypeOpen = (type: string) =>
         setOpenTypes((prev) => ({...prev, [type]: !prev[type]}));
 
+    const supportedTypes = ['tfrm', 'tstr', 'tver', 'tstl', 'talt', 'tbmp', 'taib', 'mbar'];
+
     return (
         <Panel
             title={
@@ -247,10 +249,12 @@ export function PrcExplorerPanel({
                             <List dense component="nav">
                                 {Object.entries(groupedResources).map(([type, records]) => {
                                     const isExpanded = !!openTypes[type];
+                                    const iconColor = supportedTypes.includes(type.toLowerCase()) ? "#4caf50" : "#e0a910";
+
                                     return (
                                         <Box key={type}>
                                             <ListItemButton onClick={() => toggleTypeOpen(type)} sx={{py: 0.5}}>
-                                                <FolderIcon fontSize="small" sx={{mr: 1, color: "#e0a910"}}/>
+                                                <FolderIcon fontSize="small" sx={{mr: 1, color: iconColor}}/>
                                                 <ListItemText
                                                     primary={`${type} (${records.length})`}
                                                     primaryTypographyProps={{
