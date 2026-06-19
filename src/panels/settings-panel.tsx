@@ -9,11 +9,9 @@ import { useState } from "react";
 import PeopleIcon from '@mui/icons-material/People';
 import SaveIcon from '@mui/icons-material/Save';
 import ScienceIcon from "@mui/icons-material/Science";
-import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import { ManagerUsersPanel } from "./settings/manage-users-panel";
 import { TestPanel } from "./settings/test-panel";
 import { DataMgmtPanel } from "./settings/data-mgmt-panel";
-import { CalendarSettingsPanel } from "./settings/calendar-settings-panel";
 import { GoogleSettingsPanel } from "./settings/google-settings-panel";
 import GoogleIcon from '@mui/icons-material/Google';
 
