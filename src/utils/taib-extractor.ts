@@ -600,9 +600,9 @@ export function extractTAIBResourceById(
  * - Fall back to any tAIB resource if 1000 is absent
  * - Return the highest-density decoded bitmap as the single default
  */
-export const extractTAIBResource = (
+export const extractBestAppIcon = (
     rawDb: RawPdbDatabase | RawPrcDatabase
-): TAIBBitmap => {
+): TAIBBitmap | null => {
     let candidates = extractTAIBBitmapsFromDb(rawDb, 1000);
 
     if (candidates.length === 0) {
@@ -615,8 +615,7 @@ export const extractTAIBResource = (
     }
 
     if (candidates.length === 0) {
-        // dbg("No tAIB resource found in database", rawDb?.header?.name);
-        return placeholderBitmap;
+        return null;
     }
 
     candidates.sort((a, b) => {

@@ -14,7 +14,7 @@ import { Panel } from "../panel";
 import { WebDatabaseStorageImplementation } from "../database-storage/web-db-stg-impl";
 import hotsyncEvents, { HotsyncEvents } from "../event-emitter/hotsync-event-emitter";
 import { prefsStore } from "../prefs-store";
-import { extractTAIBResource } from "../utils/taib-extractor";
+import { extractBestAppIcon } from "../utils/taib-extractor";
 import { PalmIcon } from "../components/PalmIcon.tsx";
 import {PrcExplorerPanel} from "./prc-explorer-panel.tsx";
 import {ManageSearch} from "@mui/icons-material";
@@ -126,7 +126,10 @@ export function InstalledAppsPanel(props: PaperProps) {
                         ) : (
                             installedDatabases.map((db, index) => {
                                 const appName = db?.header?.name ?? "Unknown App";
-                                const bitmap = extractTAIBResource(db);
+                                const bitmap = extractBestAppIcon(db);
+                                if (!bitmap) {
+                                    console.warn("No bitmap");
+                                }
                                 const creatorCode = db?.header?.creator ?? "??? ";
 
                                 return (
@@ -159,7 +162,16 @@ export function InstalledAppsPanel(props: PaperProps) {
                                         }
                                     >
                                         <ListItemIcon style={{ marginInlineEnd: "1em" }}>
-                                            <PalmIcon bitmap={bitmap} />
+                                            {bitmap && (
+                                                <PalmIcon bitmap={bitmap} />
+                                            )}
+                                            {!bitmap && (
+                                                <img
+                                                    src="/generic_icon.png"
+                                                    alt="Default icon"
+                                                    style={{ width: 44, height: 44, objectFit: 'contain' }}
+                                                />
+                                            )}
                                         </ListItemIcon>
                                         <ListItemText
                                             primary={appName}

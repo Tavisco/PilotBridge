@@ -1,8 +1,7 @@
 import '@fontsource/inter';
 import CssBaseline from '@mui/material/CssBaseline';
-import { createTheme, ThemeProvider } from '@mui/material/styles';
-import useMediaQuery from '@mui/material/useMediaQuery';
-import React, { useMemo} from 'react';
+import { ThemeProvider } from '@mui/material/styles';
+import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { App } from './app';
 import { GoogleOAuthProvider } from '@react-oauth/google';

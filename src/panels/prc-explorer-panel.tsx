@@ -18,7 +18,7 @@ import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
 import FileUploadIcon from "@mui/icons-material/FileUpload";
 import {DatabaseHdrType, RawPdbDatabase, RawPrcDatabase} from "palm-pdb";
 import {Panel} from "../panel";
-import {PalmIcon} from "../components/PalmIcon";
+
 import {
     extractAllTAIBBitmapsFromResource,
     toUint8Array,
