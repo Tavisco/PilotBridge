@@ -67,11 +67,12 @@ export function PrcExplorerPanel({
 
     const activeDb = externalDb ?? localDb;
 
-    const handleGetBitmapData = (resourceId: number) => {
-        if (!activeDb || !activeDb.records) return null;
+    const handleGetBitmapData = (resourceId: number | string) => {
+        // If it's a string, convert it to a number first
+        const numericId = typeof resourceId === 'string' ? parseInt(resourceId, 10) : resourceId;   if (!activeDb || !activeDb.records) return null;
 
         const imageRecord = (activeDb.records as ResourceRecord[]).find(
-            (r) => r.entry.resourceId === resourceId && (r.entry.type === "Tbmp" || r.entry.type === "tAIB")
+            (r) => r.entry.resourceId === numericId && (r.entry.type === "Tbmp" || r.entry.type === "tAIB")
         );
 
         if (!imageRecord) return null;
@@ -84,7 +85,7 @@ export function PrcExplorerPanel({
             .sort((a, b) => a < b ? 1 : -1)
             .at(0);
 
-        // Return the raw data object, not <PalmIcon />
+
         return targetBmp || null;
     };
 

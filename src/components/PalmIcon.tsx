@@ -2,8 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { palm8BitIndexToRGB } from "../utils/palm-palette";
 
 import {
-    PLACEHOLDER_SIZE,
-    placeholderBitmap
+    PLACEHOLDER_SIZE
 } from "../utils/taib-extractor";
 
 import { TAIBBitmap } from "../utils/taib-types";
@@ -12,6 +11,20 @@ interface PalmIconProps {
     bitmap?: TAIBBitmap;
     scale?: number;
 }
+
+const placeholderBitmap: TAIBBitmap = {
+    width: PLACEHOLDER_SIZE,
+    height: PLACEHOLDER_SIZE,
+    rowBytes: 3,
+    flags: 0,
+    bpp: 1,
+    version: 1,
+    transparentIndex: null,
+    compressionType: null,
+    density: 72,
+    pixels: new Uint8Array(PLACEHOLDER_SIZE * PLACEHOLDER_SIZE),
+    palette: undefined,
+};
 
 export const drawTAIBBitmap = (
     canvas: HTMLCanvasElement,
@@ -27,11 +40,6 @@ export const drawTAIBBitmap = (
     const width = Number(bmp.width) || 0;
     const height = Number(bmp.height) || 0;
 
-    /*
-     * CRITICAL:
-     * Old code safely handled invalid dimensions.
-     * Restore that behavior so other parts of the app don't explode.
-     */
     if (
         !Number.isFinite(width) ||
         !Number.isFinite(height) ||

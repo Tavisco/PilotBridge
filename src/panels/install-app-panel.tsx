@@ -6,7 +6,6 @@ import {
   Dialog, DialogTitle, DialogContent,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
-import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import CloseIcon from "@mui/icons-material/Close";
 import { RawPdbDatabase, RawPrcDatabase } from "palm-pdb";
 

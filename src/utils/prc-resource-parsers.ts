@@ -106,8 +106,8 @@ export function escapeQuotedText(text: string): string {
 }
 
 export function fmtBounds(r: RectLike, container?: RectLike): string {
-    const x = fmtCoord(r.x, r.w, container?.w, "x");
-    const y = fmtCoord(r.y, r.h, container?.h, "y");
+    const x = fmtCoord(r.x, r.w, container?.w);
+    const y = fmtCoord(r.y, r.h, container?.h);
     const ww = r.w === 0 ? "AUTO" : String(r.w);
     const hh = r.h === 0 ? "AUTO" : String(r.h);
     return `(${x} ${y} ${ww} ${hh})`;
@@ -182,7 +182,7 @@ export function formatHexView(bytes: Uint8Array): string {
     return out.join("\n");
 }
 
-function fmtCoord(value: number, extent: number, containerExtent: number | undefined, axis: "x" | "y"): string {
+function fmtCoord(value: number, _extent: number, containerExtent: number | undefined): string {
     if (containerExtent == null) return String(value);
 
     // PilRC can resolve CENTER / RIGHT / BOTTOM. We can recover those

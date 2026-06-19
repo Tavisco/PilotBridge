@@ -24,29 +24,7 @@ const PilCompressed = 0x8000;
 const PilHasColorTable = 0x4000;
 const PilTransparent = 0x2000;
 
-const ENABLE_TAIB_DEBUG = true;
-
 export const PLACEHOLDER_SIZE = 22;
-
-export const placeholderBitmap: TAIBBitmap = {
-    width: PLACEHOLDER_SIZE,
-    height: PLACEHOLDER_SIZE,
-    rowBytes: 3,
-    flags: 0,
-    bpp: 1,
-    version: 1,
-    transparentIndex: null,
-    compressionType: null,
-    density: 72,
-    pixels: new Uint8Array(PLACEHOLDER_SIZE * PLACEHOLDER_SIZE),
-    palette: undefined,
-};
-
-function dbg(...args: any[]) {
-    if (ENABLE_TAIB_DEBUG) {
-        console.debug("[tAIB]", ...args);
-    }
-}
 
 export function toUint8Array(
     input: Uint8Array | ArrayBuffer | ArrayBufferView | number[] | Buffer

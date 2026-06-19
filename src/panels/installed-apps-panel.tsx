@@ -127,9 +127,6 @@ export function InstalledAppsPanel(props: PaperProps) {
                             installedDatabases.map((db, index) => {
                                 const appName = db?.header?.name ?? "Unknown App";
                                 const bitmap = extractBestAppIcon(db);
-                                if (!bitmap) {
-                                    console.warn("No bitmap");
-                                }
                                 const creatorCode = db?.header?.creator ?? "??? ";
 
                                 return (
