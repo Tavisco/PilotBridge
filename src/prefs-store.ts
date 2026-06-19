@@ -8,6 +8,7 @@ export interface Prefs {
   enabledOptConduits: string[];
   googleToken: string;
   googleTokenDate: Date | null;
+  themeMode: "light" | "dark" | "auto";
 }
 
 function getDefaultConnectionString() {
@@ -30,6 +31,7 @@ export const DEFAULT_PREFS: Prefs = Object.freeze({
   enabledOptConduits: [] as string[],
   googleToken: '',
   googleTokenDate: null,
+  themeMode: "auto",
 });
 
 class PrefsStore {

@@ -1,5 +1,5 @@
 import Typography from "@mui/material/Typography";
-import { useCallback } from "react";
+import {useCallback, useEffect} from "react";
 import {
   Toolbar,
   Divider,
@@ -23,7 +23,6 @@ import React from "react";
 import { observer } from "mobx-react";
 import { UsbIcon, SerialIcon } from "./icons";
 import { prefsStore } from "./prefs-store";
-import { InstallAppPanel } from "./panels/install-app-panel";
 import { DeviceInfoPanel } from "./device-info-panel";
 import { DoHotsyncBar } from "./do-hotsync-bar";
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -33,6 +32,7 @@ import InfoIcon from "@mui/icons-material/Info";
 import InstallMobileIcon from "@mui/icons-material/InstallMobile";
 import HomeIcon from '@mui/icons-material/Home';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import TerminalIcon from '@mui/icons-material/Terminal';
 import { LogViewer } from "./log-viewer";
 import { AboutPanel } from "./panels/about-panel";
 import { HomePanel } from "./panels/home-panel";
@@ -40,6 +40,11 @@ import { SettingsPanel } from "./panels/settings-panel";
 import { TodoPanel } from "./panels/todo-panel";
 import { CalendarPanel } from "./panels/calendar-panel";
 import 'react-big-calendar/lib/css/react-big-calendar.css';
+import {ManageAppsPage} from "./panels/manage-apps.tsx";
+import {PrcExplorerPanel} from "./panels/prc-explorer-panel.tsx";
+import {ManageSearch} from "@mui/icons-material";
+import {ThemeModeSelector} from "./components/ThemeModeSelector.tsx";
+import hotsyncEvents, {HotsyncEvents} from "./event-emitter/hotsync-event-emitter.tsx";
 
 
 function UnsupportedApisBanner() {
@@ -122,7 +127,9 @@ const ConnectionSelector = observer(function ConnectionSelector() {
 export function App() {
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [currentComponent, setCurrentComponent] = React.useState("home");
+  const [logVisible, setLogVisible] = React.useState(false);
   const drawerWidth = 240;
+  let wasLogOpen = false;
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -132,6 +139,27 @@ export function App() {
     setCurrentComponent(component);
     setMobileOpen(false);
   };
+
+  // 2. HotSync Listeners
+  useEffect(() => {
+    const handleHotsyncStarted = () => {
+      wasLogOpen = logVisible;
+      setLogVisible(true);
+    }
+    const handleHotsyncFinished = () => {
+      setLogVisible(wasLogOpen);
+    };
+
+    hotsyncEvents.on(HotsyncEvents.HotsyncStarted, handleHotsyncStarted);
+    hotsyncEvents.on(HotsyncEvents.HotsyncFinished, handleHotsyncFinished);
+    hotsyncEvents.on(HotsyncEvents.HotsyncUserChanged, handleHotsyncFinished);
+
+    return () => {
+      hotsyncEvents.off(HotsyncEvents.HotsyncStarted, handleHotsyncStarted);
+      hotsyncEvents.off(HotsyncEvents.HotsyncFinished, handleHotsyncFinished);
+      hotsyncEvents.on(HotsyncEvents.HotsyncUserChanged, handleHotsyncFinished);
+    };
+  }, []);
 
   const drawer = (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -206,7 +234,18 @@ export function App() {
               <ListItemIcon>
                 <InstallMobileIcon />
               </ListItemIcon>
-              <ListItemText primary="Install App" />
+              <ListItemText primary="Manage Apps" />
+            </ListItemButton>
+          </ListItem>
+          <ListItem key="explore-database" disablePadding>
+            <ListItemButton
+                selected={currentComponent === "explore"}
+                onClick={() => handleListItemClick("explore")}
+            >
+              <ListItemIcon>
+                <ManageSearch />
+              </ListItemIcon>
+              <ListItemText primary="Database explorer" />
             </ListItemButton>
           </ListItem>
           {/* <ListItem key="retrieve-app" disablePadding>
@@ -247,6 +286,8 @@ export function App() {
       </div>
       <div style={{ marginTop: "auto" }}>
         <Divider />
+        <ThemeModeSelector />
+        <Divider />
         <DeviceInfoPanel />
         <Divider />
         <ConnectionSelector />
@@ -271,13 +312,15 @@ export function App() {
       case "memo":
         return <div>WIP Memo</div>;
       case "install":
-        return <InstallAppPanel />;
+        return <ManageAppsPage />;
       case "retrieve":
         return <div>WIP Retrieve app</div>;
       case "settings":
         return <SettingsPanel />;
       case "about":
         return <AboutPanel />;
+      case "explore":
+        return <PrcExplorerPanel database={null} />;
       default:
         return <HomePanel />;
     }
@@ -304,6 +347,14 @@ export function App() {
             <MenuIcon />
           </IconButton>
           <DoHotsyncBar />
+          <Box sx={{ flexGrow: 1 }} /> {/* pushes the toggle to the right */}
+          <IconButton
+              color="inherit"
+              onClick={() => setLogVisible(prev => !prev)}
+              title="Toggle log viewer"
+          >
+            <TerminalIcon />
+          </IconButton>
         </Toolbar>
       </AppBar>
       <Box
@@ -352,7 +403,7 @@ export function App() {
         <Toolbar />
 
         <Grid container spacing={2}>
-          <Grid item={true} xs={12} md={8}>
+          <Grid item xs={12} md={logVisible ? 8 : 12}>
             <Container
               sx={{
                 paddingX: { xs: 2, sm: 4, md: 1 }, // Adjust padding for different screen sizes
@@ -364,9 +415,11 @@ export function App() {
               {renderComponent()}
             </Container>
           </Grid>
-          <Grid item={true} xs={12} md={4}>
-            <LogViewer />
-          </Grid>
+          {logVisible && (
+              <Grid item xs={12} md={4}>
+                <LogViewer />
+              </Grid>
+          )}
         </Grid>
       </Box>
     </Box>

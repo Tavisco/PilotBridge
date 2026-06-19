@@ -69,7 +69,7 @@ export class WebDatabaseStorageImplementation
     requestedUserName: string,
     dbName: string
   ): Promise<Buffer> {
-    console.log(`Reading DB [${requestedUserName}]\\[${dbName}]`);
+    // console.log(`Reading DB [${requestedUserName}]\\[${dbName}]`);
     const backupDir = await this.getBackupDirectory(requestedUserName);
     let fileHandle;
 
@@ -142,7 +142,7 @@ export class WebDatabaseStorageImplementation
     databases: Array<RawPdbDatabase | RawPrcDatabase>;
     filenames: string[];
   }> {
-    console.log("Get install DB");
+    // console.log("Get install DB");
     const installDir = await this.getInstallDirectory(requestedUserName);
     const databases: Array<RawPdbDatabase | RawPrcDatabase> = [];
     const filenames: string[] = [];

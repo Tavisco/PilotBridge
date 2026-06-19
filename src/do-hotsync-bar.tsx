@@ -208,7 +208,7 @@ export const DoHotsyncBar = observer(function DoHotsyncBar() {
             PilotBridge
           </Typography>
           <Typography variant="caption" sx={{ opacity: 0.7, fontFamily: 'monospace' }}>
-            v1.4.0
+            v1.5.0
           </Typography>
         </Box>
 

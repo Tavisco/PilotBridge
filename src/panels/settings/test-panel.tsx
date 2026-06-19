@@ -15,7 +15,7 @@ function NoOp() {
 
   return (
     <Button variant="contained" fullWidth onClick={handleClick}>
-      No-op
+      Trigger No-op Hotsync
     </Button>
   );
 }
@@ -32,7 +32,7 @@ function ListDb() {
   }, []);
   return (
     <Button variant="contained" fullWidth onClick={handleClick}>
-      List DB
+      Trigger List DB to console Hotsync
     </Button>
   );
 }
