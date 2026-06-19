@@ -1,5 +1,5 @@
 import Typography from "@mui/material/Typography";
-import { useCallback } from "react";
+import {useCallback, useEffect} from "react";
 import {
   Toolbar,
   Divider,
@@ -44,6 +44,7 @@ import {ManageAppsPage} from "./panels/manage-apps.tsx";
 import {PrcExplorerPanel} from "./panels/prc-explorer-panel.tsx";
 import {ManageSearch} from "@mui/icons-material";
 import {ThemeModeSelector} from "./components/ThemeModeSelector.tsx";
+import hotsyncEvents, {HotsyncEvents} from "./event-emitter/hotsync-event-emitter.tsx";
 
 
 function UnsupportedApisBanner() {
@@ -128,6 +129,7 @@ export function App() {
   const [currentComponent, setCurrentComponent] = React.useState("home");
   const [logVisible, setLogVisible] = React.useState(false);
   const drawerWidth = 240;
+  let wasLogOpen = false;
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -137,6 +139,27 @@ export function App() {
     setCurrentComponent(component);
     setMobileOpen(false);
   };
+
+  // 2. HotSync Listeners
+  useEffect(() => {
+    const handleHotsyncStarted = () => {
+      wasLogOpen = logVisible;
+      setLogVisible(true);
+    }
+    const handleHotsyncFinished = () => {
+      setLogVisible(wasLogOpen);
+    };
+
+    hotsyncEvents.on(HotsyncEvents.HotsyncStarted, handleHotsyncStarted);
+    hotsyncEvents.on(HotsyncEvents.HotsyncFinished, handleHotsyncFinished);
+    hotsyncEvents.on(HotsyncEvents.HotsyncUserChanged, handleHotsyncFinished);
+
+    return () => {
+      hotsyncEvents.off(HotsyncEvents.HotsyncStarted, handleHotsyncStarted);
+      hotsyncEvents.off(HotsyncEvents.HotsyncFinished, handleHotsyncFinished);
+      hotsyncEvents.on(HotsyncEvents.HotsyncUserChanged, handleHotsyncFinished);
+    };
+  }, []);
 
   const drawer = (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
