@@ -1,6 +1,6 @@
-import { DatabaseHdrType, RawPdbDatabase, RawPrcDatabase } from "palm-pdb";
 import { DatabaseStorageInterface } from "palm-sync";
 import { v4 as uuidv4 } from "uuid";
+import {DatabaseHdrType, RawPdbDatabase, RawPrcDatabase} from "palm-pdb";
 
 export class WebDatabaseStorageImplementation
   implements DatabaseStorageInterface
